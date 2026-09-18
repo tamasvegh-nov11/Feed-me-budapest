@@ -13,6 +13,15 @@ export default function Home() {
   const [landmarks, setLandmarks] = useState([]);
   const [categories, setCategories] = useState([]);
 
+  const [landmark, setLandmark] = useState("");
+  const [category, setCategory] = useState("");
+  const [distance, setDistance] = useState("10");
+
+  const [results, setResults] = useState([]);
+  const [searched, setSearched] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
   useEffect(() => {
     async function loadFilters() {
       const { data: landmarkData } = await supabase
@@ -32,6 +41,141 @@ export default function Home() {
 
     loadFilters();
   }, []);
+
+  async function findPlaces() {
+    if (!landmark) {
+      setError("Please choose a Budapest landmark first.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setSearched(true);
+    setResults([]);
+
+    let relationQuery = supabase
+      .from("feed_landmark_relations")
+      .select("restaurant_id,public_distance")
+      .eq("landmark_id", landmark);
+
+    if (distance === "10") {
+      relationQuery = relationQuery.eq(
+        "public_distance",
+        "Within 10 min"
+      );
+    }
+
+    const { data: relationData, error: relationError } =
+      await relationQuery;
+
+    if (relationError) {
+      setError("We couldn't load recommendations. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    if (!relationData || relationData.length === 0) {
+      setLoading(false);
+      return;
+    }
+
+    let eligibleRelations = relationData;
+
+    if (category) {
+      const ids = relationData.map((item) => item.restaurant_id);
+
+      const { data: categoryLinks, error: categoryError } =
+        await supabase
+          .from("feed_restaurant_categories")
+          .select("restaurant_id")
+          .eq("category_id", category)
+          .in("restaurant_id", ids);
+
+      if (categoryError) {
+        setError("We couldn't load recommendations. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      const allowedIds = new Set(
+        (categoryLinks || []).map((item) => item.restaurant_id)
+      );
+
+      eligibleRelations = relationData.filter((item) =>
+        allowedIds.has(item.restaurant_id)
+      );
+    }
+
+    if (eligibleRelations.length === 0) {
+      setLoading(false);
+      return;
+    }
+
+    const eligibleIds = eligibleRelations.map(
+      (item) => item.restaurant_id
+    );
+
+    const { data: restaurantData, error: restaurantError } =
+      await supabase
+        .from("feed_restaurants")
+        .select(
+          "id,name,status,walk_in,confidence,why_we_like_it,good_to_know,primary_area"
+        )
+        .eq("active", true)
+        .in("id", eligibleIds);
+
+    if (restaurantError) {
+      setError("We couldn't load recommendations. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    const distanceMap = {};
+
+    eligibleRelations.forEach((item) => {
+      distanceMap[item.restaurant_id] = item.public_distance;
+    });
+
+    let finalResults = (restaurantData || []).map((restaurant) => ({
+      ...restaurant,
+      public_distance: distanceMap[restaurant.id],
+    }));
+
+    finalResults.sort((a, b) => {
+      if (
+        a.public_distance === "Within 10 min" &&
+        b.public_distance !== "Within 10 min"
+      ) {
+        return -1;
+      }
+
+      if (
+        b.public_distance === "Within 10 min" &&
+        a.public_distance !== "Within 10 min"
+      ) {
+        return 1;
+      }
+
+      return a.name.localeCompare(b.name);
+    });
+
+    finalResults = finalResults.slice(0, 5);
+
+    setResults(finalResults);
+    setLoading(false);
+
+    setTimeout(() => {
+      document
+        .getElementById("results")
+        ?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  }
+
+  function googleMapsLink(name) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+      `${name}, Budapest`
+    )}`;
+  }
 
   return (
     <main>
@@ -55,21 +199,24 @@ export default function Home() {
           </h1>
 
           <p className="intro">
-            Choose a Budapest landmark, tell us what you feel like eating and
-            how far you're willing to walk. We'll show you a small selection of
-            places we'd actually recommend.
+            Choose a Budapest landmark, tell us what you feel like eating
+            and how far you're willing to walk. We'll show you a small
+            selection of places we'd actually recommend.
           </p>
 
           <div className="finder">
             <div className="field">
               <label>Where will you be?</label>
-              <select defaultValue="">
-                <option value="" disabled>
-                  Select a landmark
-                </option>
-                {landmarks.map((landmark) => (
-                  <option key={landmark.id} value={landmark.id}>
-                    {landmark.name}
+
+              <select
+                value={landmark}
+                onChange={(e) => setLandmark(e.target.value)}
+              >
+                <option value="">Select a landmark</option>
+
+                {landmarks.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
                   </option>
                 ))}
               </select>
@@ -77,11 +224,16 @@ export default function Home() {
 
             <div className="field">
               <label>What do you feel like?</label>
-              <select defaultValue="">
-                <option value="">Any cuisine</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
+
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                <option value="">Anything good</option>
+
+                {categories.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
                   </option>
                 ))}
               </select>
@@ -89,16 +241,86 @@ export default function Home() {
 
             <div className="field">
               <label>How far would you walk?</label>
-              <select defaultValue="10">
+
+              <select
+                value={distance}
+                onChange={(e) => setDistance(e.target.value)}
+              >
                 <option value="10">Up to 10 minutes</option>
                 <option value="15">Up to 15 minutes</option>
               </select>
             </div>
 
-            <button className="feed-button">FEED ME</button>
+            <button
+              className="feed-button"
+              onClick={findPlaces}
+              disabled={loading}
+            >
+              {loading ? "FINDING..." : "FEED ME"}
+            </button>
           </div>
+
+          {error && <p className="search-error">{error}</p>}
         </div>
       </section>
+
+      {searched && (
+        <section id="results" className="results-section">
+          <p className="eyebrow">YOUR PICKS</p>
+
+          <h2>
+            {results.length
+              ? "Places we'd recommend"
+              : "Nothing we'd confidently recommend here yet."}
+          </h2>
+
+          {results.length > 0 && (
+            <p className="results-intro">
+              A small selection based on your choices — not an endless
+              list of everything nearby.
+            </p>
+          )}
+
+          <div className="results-grid">
+            {results.map((restaurant) => (
+              <article className="result-card" key={restaurant.id}>
+                <div className="result-top">
+                  <span>{restaurant.public_distance}</span>
+
+                  {restaurant.status === "Approved - Peak Check" && (
+                    <span>Peak times may be busy</span>
+                  )}
+                </div>
+
+                <h3>{restaurant.name}</h3>
+
+                {restaurant.why_we_like_it && (
+                  <div className="result-copy">
+                    <strong>Why we like it</strong>
+                    <p>{restaurant.why_we_like_it}</p>
+                  </div>
+                )}
+
+                {restaurant.good_to_know && (
+                  <div className="result-copy">
+                    <strong>Good to know</strong>
+                    <p>{restaurant.good_to_know}</p>
+                  </div>
+                )}
+
+                <a
+                  className="directions-link"
+                  href={googleMapsLink(restaurant.name)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  GET DIRECTIONS →
+                </a>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="how-preview">
         <div>
@@ -111,9 +333,10 @@ export default function Home() {
           </h2>
 
           <p>
-            Feed Me doesn't show you every restaurant nearby. We start with
-            places we'd actually recommend, then match them to where you're
-            going, what you want and how far you're willing to walk.
+            Feed Me doesn't show you every restaurant nearby. We start
+            with places we'd actually recommend, then match them to where
+            you're going, what you want and how far you're willing to
+            walk.
           </p>
 
           <Link href="/how-it-works" className="text-link">
@@ -161,13 +384,16 @@ export default function Home() {
 
         <div>
           <strong>Made for spontaneous plans</strong>
-          <span>No endless searching</span>
+          <span>Less searching. More eating.</span>
         </div>
       </section>
 
       <footer>
         <strong>Feed Me Budapest</strong>
-        <span>Sightseeing is easy. Finding somewhere good to eat nearby isn't.</span>
+
+        <span>
+          Sightseeing is easy. Finding somewhere good to eat nearby isn't.
+        </span>
       </footer>
     </main>
   );
