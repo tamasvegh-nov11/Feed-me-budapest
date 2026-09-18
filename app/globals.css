@@ -764,3 +764,153 @@ footer strong {
     margin-top: 4px;
   }
 }
+
+/* CONTACT PAGE */
+
+.contact-form {
+  max-width: 720px;
+  margin-top: 46px;
+  padding: 32px;
+  background: #ffffff;
+  border: 1px solid #e5e7e9;
+  border-radius: 18px;
+  box-shadow:
+    0 1px 2px rgba(60, 64, 67, 0.05),
+    0 6px 22px rgba(60, 64, 67, 0.06);
+}
+
+.contact-field {
+  margin-bottom: 22px;
+}
+
+.contact-field label {
+  display: block;
+  margin-bottom: 8px;
+  color: #3c4043;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.contact-field input,
+.contact-field select,
+.contact-field textarea {
+  width: 100%;
+  border: 1px solid #dadce0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #202124;
+  font-family: inherit;
+  font-size: 15px;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.contact-field input,
+.contact-field select {
+  min-height: 48px;
+  padding: 0 14px;
+}
+
+.contact-field textarea {
+  min-height: 150px;
+  padding: 14px;
+  resize: vertical;
+  line-height: 1.55;
+}
+
+.contact-field input::placeholder,
+.contact-field textarea::placeholder {
+  color: #9aa0a6;
+}
+
+.contact-field input:focus,
+.contact-field select:focus,
+.contact-field textarea:focus {
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.09);
+}
+
+.contact-button {
+  min-height: 48px;
+  margin: 3px 0 0;
+  padding: 0 22px;
+}
+
+.contact-error,
+.contact-success {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.contact-error {
+  background: #fce8e6;
+  color: #a50e0e;
+}
+
+.contact-success {
+  background: #e6f4ea;
+  color: #137333;
+}
+
+.contact-note {
+  max-width: 720px;
+  margin-top: 34px;
+  padding: 26px 28px;
+  background: #f8f9fa;
+  border-radius: 14px;
+}
+
+.contact-note strong {
+  display: block;
+  margin-bottom: 9px;
+  color: #303134;
+  font-size: 14px;
+}
+
+.contact-note p {
+  margin: 0 0 8px;
+  color: #6f7479;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.contact-note p:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 800px) {
+  .contact-form {
+    margin-top: 34px;
+    padding: 22px;
+    border-radius: 15px;
+  }
+
+  .contact-field {
+    margin-bottom: 19px;
+  }
+
+  .contact-field input,
+  .contact-field select {
+    min-height: 46px;
+    font-size: 14px;
+  }
+
+  .contact-field textarea {
+    min-height: 135px;
+    font-size: 14px;
+  }
+
+  .contact-button {
+    width: 100%;
+  }
+
+  .contact-note {
+    margin-top: 26px;
+    padding: 22px;
+  }
+}
