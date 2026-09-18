@@ -481,3 +481,117 @@ footer strong {
     justify-content: center;
   }
 }
+
+.how-page {
+  padding: 85px 32px 110px;
+}
+
+.how-page-inner {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.how-page h1 {
+  margin: 0;
+  font-size: clamp(46px, 6vw, 72px);
+  line-height: 1.04;
+  letter-spacing: -3px;
+}
+
+.how-lead {
+  max-width: 700px;
+  margin: 28px 0 70px;
+  color: #6b7280;
+  font-size: 19px;
+  line-height: 1.7;
+}
+
+.how-sections {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 42px 60px;
+}
+
+.how-sections section {
+  padding-top: 22px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.how-sections span {
+  display: block;
+  margin-bottom: 18px;
+  color: #9aa0a6;
+  font-size: 12px;
+}
+
+.how-sections h2 {
+  margin: 0 0 14px;
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+}
+
+.how-sections p {
+  margin: 0 0 12px;
+  color: #666;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.how-cta {
+  margin-top: 90px;
+  padding: 42px;
+  border-radius: 18px;
+  background: #f8f9fa;
+}
+
+.how-cta h2 {
+  margin: 0 0 10px;
+  font-size: 34px;
+  letter-spacing: -1px;
+}
+
+.how-cta p {
+  max-width: 580px;
+  margin: 0 0 25px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.how-home-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin: 0;
+}
+
+@media (max-width: 800px) {
+  .how-page {
+    padding: 60px 20px 80px;
+  }
+
+  .how-page h1 {
+    font-size: 44px;
+    letter-spacing: -2px;
+  }
+
+  .how-lead {
+    margin-bottom: 50px;
+    font-size: 17px;
+  }
+
+  .how-sections {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .how-sections h2 {
+    font-size: 22px;
+  }
+
+  .how-cta {
+    margin-top: 65px;
+    padding: 30px 24px;
+  }
+}
