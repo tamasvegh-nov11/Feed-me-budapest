@@ -332,3 +332,152 @@ footer strong {
     margin-top: 6px;
   }
 }
+
+.results-section {
+  max-width: 1120px;
+  margin: 0 auto 110px;
+  padding: 0 32px;
+}
+
+.results-section h2 {
+  margin: 0;
+  font-size: 44px;
+  line-height: 1.08;
+  letter-spacing: -1.6px;
+}
+
+.results-intro {
+  max-width: 660px;
+  margin: 18px 0 34px;
+  color: #6b7280;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.result-card {
+  padding: 28px;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.035);
+}
+
+.result-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.result-top span:first-child {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.result-top span:last-child {
+  text-align: right;
+}
+
+.result-card h3 {
+  margin: 0 0 24px;
+  font-size: 27px;
+  line-height: 1.18;
+  letter-spacing: -0.7px;
+}
+
+.result-copy {
+  margin-top: 20px;
+}
+
+.result-copy strong {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 13px;
+}
+
+.result-copy p {
+  margin: 0;
+  color: #666;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.directions-link {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 26px;
+  padding: 12px 16px;
+  border-radius: 9px;
+  background: #1a73e8;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.directions-link:hover {
+  background: #1765cc;
+}
+
+.search-error {
+  margin-top: 18px;
+  color: #b42318;
+  font-size: 14px;
+}
+
+@media (max-width: 800px) {
+  .results-section {
+    margin-bottom: 75px;
+    padding: 0 20px;
+  }
+
+  .results-section h2 {
+    font-size: 34px;
+    letter-spacing: -1.2px;
+  }
+
+  .results-intro {
+    margin-bottom: 26px;
+    font-size: 15px;
+  }
+
+  .results-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .result-card {
+    padding: 22px;
+    border-radius: 16px;
+  }
+
+  .result-card h3 {
+    font-size: 24px;
+  }
+
+  .result-top {
+    display: block;
+  }
+
+  .result-top span {
+    display: inline-block;
+    margin-right: 8px;
+    margin-bottom: 8px;
+  }
+
+  .directions-link {
+    width: 100%;
+    justify-content: center;
+  }
+}
