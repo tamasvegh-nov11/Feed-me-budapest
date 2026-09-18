@@ -595,6 +595,28 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="home-contact">
+        <div className="home-contact-inner">
+          <div>
+            <p className="eyebrow">CONTACT</p>
+
+            <h2>See something we should know?</h2>
+
+            <p>
+              Found outdated information, know a place we should
+              review, or just want to get in touch? Send us a message.
+            </p>
+          </div>
+
+          <Link
+            href="/contact"
+            className="home-contact-button"
+          >
+            CONTACT US →
+          </Link>
+        </div>
+      </section>
+
       <footer>
         <strong>Feed Me Budapest</strong>
 
