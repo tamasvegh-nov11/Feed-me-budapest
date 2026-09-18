@@ -9,6 +9,35 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 );
 
+function weightedSample(items, count) {
+  const pool = [...items];
+  const selected = [];
+
+  while (pool.length > 0 && selected.length < count) {
+    const totalWeight = pool.reduce(
+      (sum, item) => sum + (item.recommendation_weight || 1),
+      0
+    );
+
+    let random = Math.random() * totalWeight;
+    let chosenIndex = 0;
+
+    for (let i = 0; i < pool.length; i++) {
+      random -= pool[i].recommendation_weight || 1;
+
+      if (random <= 0) {
+        chosenIndex = i;
+        break;
+      }
+    }
+
+    selected.push(pool[chosenIndex]);
+    pool.splice(chosenIndex, 1);
+  }
+
+  return selected;
+}
+
 export default function Home() {
   const [landmarks, setLandmarks] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -53,6 +82,8 @@ export default function Home() {
     setSearched(true);
     setResults([]);
 
+    const surpriseMe = category === "CAT12";
+
     let relationQuery = supabase
       .from("feed_landmark_relations")
       .select("restaurant_id,public_distance")
@@ -81,7 +112,7 @@ export default function Home() {
 
     let eligibleRelations = relationData;
 
-    if (category) {
+    if (category && !surpriseMe) {
       const ids = relationData.map((item) => item.restaurant_id);
 
       const { data: categoryLinks, error: categoryError } =
@@ -119,7 +150,7 @@ export default function Home() {
       await supabase
         .from("feed_restaurants")
         .select(
-          "id,name,status,walk_in,confidence,why_we_like_it,good_to_know,primary_area"
+          "id,name,status,walk_in,confidence,why_we_like_it,good_to_know,primary_area,recommendation_weight"
         )
         .eq("active", true)
         .in("id", eligibleIds);
@@ -141,25 +172,29 @@ export default function Home() {
       public_distance: distanceMap[restaurant.id],
     }));
 
-    finalResults.sort((a, b) => {
-      if (
-        a.public_distance === "Within 10 min" &&
-        b.public_distance !== "Within 10 min"
-      ) {
-        return -1;
-      }
+    if (surpriseMe) {
+      finalResults = weightedSample(finalResults, 3);
+    } else {
+      finalResults.sort((a, b) => {
+        if (
+          a.public_distance === "Within 10 min" &&
+          b.public_distance !== "Within 10 min"
+        ) {
+          return -1;
+        }
 
-      if (
-        b.public_distance === "Within 10 min" &&
-        a.public_distance !== "Within 10 min"
-      ) {
-        return 1;
-      }
+        if (
+          b.public_distance === "Within 10 min" &&
+          a.public_distance !== "Within 10 min"
+        ) {
+          return 1;
+        }
 
-      return a.name.localeCompare(b.name);
-    });
+        return a.name.localeCompare(b.name);
+      });
 
-    finalResults = finalResults.slice(0, 5);
+      finalResults = finalResults.slice(0, 5);
+    }
 
     setResults(finalResults);
     setLoading(false);
@@ -266,18 +301,23 @@ export default function Home() {
 
       {searched && (
         <section id="results" className="results-section">
-          <p className="eyebrow">YOUR PICKS</p>
+          <p className="eyebrow">
+            {category === "CAT12" ? "SURPRISE ME" : "YOUR PICKS"}
+          </p>
 
           <h2>
             {results.length
-              ? "Places we'd recommend"
+              ? category === "CAT12"
+                ? "Three places. No overthinking."
+                : "Places we'd recommend"
               : "Nothing we'd confidently recommend here yet."}
           </h2>
 
           {results.length > 0 && (
             <p className="results-intro">
-              A small selection based on your choices — not an endless
-              list of everything nearby.
+              {category === "CAT12"
+                ? "We picked three good options for you. Pick one and go."
+                : "A small selection based on your choices — not an endless list of everything nearby."}
             </p>
           )}
 
@@ -335,8 +375,7 @@ export default function Home() {
           <p>
             Feed Me doesn't show you every restaurant nearby. We start
             with places we'd actually recommend, then match them to where
-            you're going, what you want and how far you're willing to
-            walk.
+            you're going, what you want and how far you're willing to walk.
           </p>
 
           <Link href="/how-it-works" className="text-link">
