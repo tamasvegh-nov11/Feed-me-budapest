@@ -1,76 +1,111 @@
+export const dynamic = "force-dynamic";
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
 
   const placeId = searchParams.get("placeId");
-  const photoIndex = Number(searchParams.get("photoIndex") || "0");
-
-  if (!placeId) {
-    return new Response("Missing placeId", { status: 400 });
-  }
+  const indexRaw = searchParams.get("index");
 
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
 
   if (!apiKey) {
-    return new Response("Missing Google Places API key", { status: 500 });
+    return Response.json(
+      { error: "Google Places API key missing" },
+      { status: 500 }
+    );
   }
 
+  if (!placeId) {
+    return Response.json(
+      { error: "Missing placeId" },
+      { status: 400 }
+    );
+  }
+
+  const index = Number.isInteger(Number(indexRaw))
+    ? Number(indexRaw)
+    : 0;
+
   try {
-    const placeResponse = await fetch(
-      `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
+    const detailsResponse = await fetch(
+      `https://places.googleapis.com/v1/places/${encodeURIComponent(
+        placeId
+      )}`,
       {
         headers: {
           "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "photos",
+          "X-Goog-FieldMask": "photos"
         },
-        cache: "force-cache",
+        cache: "no-store"
       }
     );
 
-    if (!placeResponse.ok) {
-      return new Response("Google Place lookup failed", {
-        status: placeResponse.status,
-      });
+    if (!detailsResponse.ok) {
+      return Response.json(
+        { error: "Could not load place photos" },
+        { status: 502 }
+      );
     }
 
-    const placeData = await placeResponse.json();
+    const place = await detailsResponse.json();
+    const photos = place?.photos || [];
 
-    if (!placeData.photos || placeData.photos.length === 0) {
-      return new Response("No photo found", { status: 404 });
+    if (!photos.length) {
+      return Response.json(
+        { error: "No photos found" },
+        { status: 404 }
+      );
     }
 
     const safeIndex =
-      photoIndex >= 0 && photoIndex < placeData.photos.length
-        ? photoIndex
-        : 0;
+      index >= 0 && index < photos.length ? index : 0;
 
-    const photoName = placeData.photos[safeIndex].name;
+    const photo = photos[safeIndex];
+
+    if (!photo?.name) {
+      return Response.json(
+        { error: "Photo unavailable" },
+        { status: 404 }
+      );
+    }
 
     const photoResponse = await fetch(
-      `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=1200&skipHttpRedirect=true`,
+      `https://places.googleapis.com/v1/${photo.name}/media?maxWidthPx=1200&skipHttpRedirect=true`,
       {
         headers: {
-          "X-Goog-Api-Key": apiKey,
+          "X-Goog-Api-Key": apiKey
         },
-        cache: "force-cache",
+        cache: "no-store"
       }
     );
 
     if (!photoResponse.ok) {
-      return new Response("Google photo lookup failed", {
-        status: photoResponse.status,
-      });
+      return Response.json(
+        { error: "Could not load photo media" },
+        { status: 502 }
+      );
     }
 
     const photoData = await photoResponse.json();
 
-    if (!photoData.photoUri) {
-      return new Response("No photo URL returned", { status: 404 });
+    if (!photoData?.photoUri) {
+      return Response.json(
+        { error: "Photo URL missing" },
+        { status: 404 }
+      );
     }
 
-    return Response.redirect(photoData.photoUri, 302);
-  } catch (error) {
-    console.error("place-photo error:", error);
-
-    return new Response("Photo proxy error", { status: 500 });
+    return Response.json({
+      url: photoData.photoUri,
+      attribution:
+        photo.authorAttributions?.[0]?.displayName || null,
+      attributionUri:
+        photo.authorAttributions?.[0]?.uri || null
+    });
+  } catch {
+    return Response.json(
+      { error: "Unexpected error" },
+      { status: 500 }
+    );
   }
 }
