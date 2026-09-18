@@ -470,6 +470,7 @@ export default function Home() {
               >
                 <RestaurantPhoto
                   placeId={restaurant.google_place_id}
+                  restaurantName={restaurant.name}
                   photoIndex={
                     restaurant.google_photo_index || 0
                   }
