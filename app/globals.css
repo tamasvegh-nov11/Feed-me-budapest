@@ -739,3 +739,28 @@ footer strong {
     width: 100%;
   }
 }
+
+.result-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.live-status {
+  display: inline-block;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #fff4e5;
+  color: #8a4b08;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media (max-width: 430px) {
+  .result-statuses {
+    justify-content: flex-start;
+    margin-top: 4px;
+  }
+}
