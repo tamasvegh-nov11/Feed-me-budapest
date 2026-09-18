@@ -11,6 +11,7 @@ export default function AboutPage() {
         <nav>
           <Link href="/how-it-works">How it works</Link>
           <Link href="/about">About</Link>
+          <Link href="/contact">Contact</Link>
         </nav>
       </header>
 
@@ -156,9 +157,12 @@ export default function AboutPage() {
 
               <p>
                 If you spot something that looks outdated or think there is a
-                place we should review, you will soon be able to contact us
-                directly through the site.
+                place we should review, send us a message.
               </p>
+
+              <Link href="/contact" className="text-link">
+                Contact us →
+              </Link>
             </section>
           </div>
 
