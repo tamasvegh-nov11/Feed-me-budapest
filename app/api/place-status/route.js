@@ -1,5 +1,7 @@
 export const dynamic = "force-dynamic";
 
+const ONE_DAY_SECONDS = 60 * 60 * 24;
+
 function getBudapestNow() {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/Budapest",
@@ -21,18 +23,6 @@ function getBudapestNow() {
     hour: Number(map.hour),
     minute: Number(map.minute),
   };
-}
-
-function minutesFromHHMM(value) {
-  if (!value) return null;
-
-  const [h, m] = value.split(":").map(Number);
-
-  if (!Number.isFinite(h) || !Number.isFinite(m)) {
-    return null;
-  }
-
-  return h * 60 + m;
 }
 
 function weekdayIndex(shortName) {
@@ -57,13 +47,16 @@ async function findPlaceIdByName(name, apiKey) {
       headers: {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": apiKey,
-        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress",
+        "X-Goog-FieldMask":
+          "places.id,places.displayName,places.formattedAddress",
       },
       body: JSON.stringify({
         textQuery: `${name}, Budapest, Hungary`,
         maxResultCount: 1,
       }),
-      cache: "no-store",
+      next: {
+        revalidate: ONE_DAY_SECONDS,
+      },
     }
   );
 
@@ -85,7 +78,9 @@ async function getPlaceDetails(placeId, apiKey) {
         "X-Goog-FieldMask":
           "id,displayName,currentOpeningHours,regularOpeningHours,businessStatus",
       },
-      cache: "no-store",
+      next: {
+        revalidate: ONE_DAY_SECONDS,
+      },
     }
   );
 
@@ -101,7 +96,9 @@ function evaluateStatus(place) {
   const currentMinutes = now.hour * 60 + now.minute;
 
   const openingHours =
-    place?.currentOpeningHours || place?.regularOpeningHours || null;
+    place?.currentOpeningHours ||
+    place?.regularOpeningHours ||
+    null;
 
   if (!openingHours) {
     return {
@@ -112,7 +109,10 @@ function evaluateStatus(place) {
     };
   }
 
-  if (place?.businessStatus && place.businessStatus !== "OPERATIONAL") {
+  if (
+    place?.businessStatus &&
+    place.businessStatus !== "OPERATIONAL"
+  ) {
     return {
       recommendable: false,
       status: "closed",
@@ -139,12 +139,16 @@ function evaluateStatus(place) {
     for (const period of todaysPeriods) {
       const close = period?.close;
 
-      if (!close?.hour && close?.hour !== 0) continue;
+      if (!close || close.hour === undefined) continue;
 
-      const value = close.hour * 60 + (close.minute || 0);
+      const value =
+        close.hour * 60 + (close.minute || 0);
 
       if (value >= currentMinutes) {
-        if (closingMinutes === null || value < closingMinutes) {
+        if (
+          closingMinutes === null ||
+          value < closingMinutes
+        ) {
           closingMinutes = value;
         }
       }
@@ -158,7 +162,8 @@ function evaluateStatus(place) {
         recommendable: true,
         status: "closing_soon",
         label: "Closing soon",
-        minutesToChange: closingMinutes - currentMinutes,
+        minutesToChange:
+          closingMinutes - currentMinutes,
       };
     }
 
@@ -175,9 +180,10 @@ function evaluateStatus(place) {
   for (const period of todaysPeriods) {
     const open = period?.open;
 
-    if (!open?.hour && open?.hour !== 0) continue;
+    if (!open || open.hour === undefined) continue;
 
-    const value = open.hour * 60 + (open.minute || 0);
+    const value =
+      open.hour * 60 + (open.minute || 0);
 
     if (value >= currentMinutes) {
       if (
@@ -197,7 +203,8 @@ function evaluateStatus(place) {
       recommendable: true,
       status: "opening_soon",
       label: "Opening soon",
-      minutesToChange: nextOpeningMinutes - currentMinutes,
+      minutesToChange:
+        nextOpeningMinutes - currentMinutes,
     };
   }
 
@@ -231,30 +238,24 @@ export async function GET(request) {
   }
 
   if (!placeId) {
-    return Response.json(
-      {
-        recommendable: true,
-        status: "unknown",
-        label: null,
-        placeId: null,
-      },
-      { status: 200 }
-    );
+    return Response.json({
+      recommendable: true,
+      status: "unknown",
+      label: null,
+      placeId: null,
+    });
   }
 
   try {
     const place = await getPlaceDetails(placeId, apiKey);
 
     if (!place) {
-      return Response.json(
-        {
-          recommendable: true,
-          status: "unknown",
-          label: null,
-          placeId,
-        },
-        { status: 200 }
-      );
+      return Response.json({
+        recommendable: true,
+        status: "unknown",
+        label: null,
+        placeId,
+      });
     }
 
     const result = evaluateStatus(place);
@@ -264,14 +265,11 @@ export async function GET(request) {
       placeId,
     });
   } catch {
-    return Response.json(
-      {
-        recommendable: true,
-        status: "unknown",
-        label: null,
-        placeId,
-      },
-      { status: 200 }
-    );
+    return Response.json({
+      recommendable: true,
+      status: "unknown",
+      label: null,
+      placeId,
+    });
   }
 }
