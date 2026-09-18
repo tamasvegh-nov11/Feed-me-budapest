@@ -1,10 +1,90 @@
 export const dynamic = "force-dynamic";
 
+const THIRTY_DAYS = 60 * 60 * 24 * 30;
+
+async function findPlaceIdByName(name, apiKey) {
+  const response = await fetch(
+    "https://places.googleapis.com/v1/places:searchText",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask":
+          "places.id,places.displayName,places.formattedAddress",
+      },
+      body: JSON.stringify({
+        textQuery: `${name}, Budapest, Hungary`,
+        maxResultCount: 1,
+      }),
+      next: {
+        revalidate: THIRTY_DAYS,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = await response.json();
+
+  return data?.places?.[0]?.id || null;
+}
+
+async function getPlacePhotos(placeId, apiKey) {
+  const response = await fetch(
+    `https://places.googleapis.com/v1/places/${encodeURIComponent(
+      placeId
+    )}`,
+    {
+      headers: {
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "photos",
+      },
+      next: {
+        revalidate: THIRTY_DAYS,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return response.json();
+}
+
+async function getPhotoUrl(photoName, apiKey) {
+  const response = await fetch(
+    `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=1200&skipHttpRedirect=true`,
+    {
+      headers: {
+        "X-Goog-Api-Key": apiKey,
+      },
+      next: {
+        revalidate: THIRTY_DAYS,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return response.json();
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
 
-  const placeId = searchParams.get("placeId");
+  const placeIdFromQuery = searchParams.get("placeId");
+  const name = searchParams.get("name");
+
   const indexRaw = searchParams.get("index");
+  const index = Number.isInteger(Number(indexRaw))
+    ? Number(indexRaw)
+    : 0;
 
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
 
@@ -15,39 +95,22 @@ export async function GET(request) {
     );
   }
 
+  let placeId = placeIdFromQuery;
+
+  if (!placeId && name) {
+    placeId = await findPlaceIdByName(name, apiKey);
+  }
+
   if (!placeId) {
     return Response.json(
-      { error: "Missing placeId" },
-      { status: 400 }
+      { error: "Place not found" },
+      { status: 404 }
     );
   }
 
-  const index = Number.isInteger(Number(indexRaw))
-    ? Number(indexRaw)
-    : 0;
-
   try {
-    const detailsResponse = await fetch(
-      `https://places.googleapis.com/v1/places/${encodeURIComponent(
-        placeId
-      )}`,
-      {
-        headers: {
-          "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "photos"
-        },
-        cache: "no-store"
-      }
-    );
+    const place = await getPlacePhotos(placeId, apiKey);
 
-    if (!detailsResponse.ok) {
-      return Response.json(
-        { error: "Could not load place photos" },
-        { status: 502 }
-      );
-    }
-
-    const place = await detailsResponse.json();
     const photos = place?.photos || [];
 
     if (!photos.length) {
@@ -69,24 +132,10 @@ export async function GET(request) {
       );
     }
 
-    const photoResponse = await fetch(
-      `https://places.googleapis.com/v1/${photo.name}/media?maxWidthPx=1200&skipHttpRedirect=true`,
-      {
-        headers: {
-          "X-Goog-Api-Key": apiKey
-        },
-        cache: "no-store"
-      }
+    const photoData = await getPhotoUrl(
+      photo.name,
+      apiKey
     );
-
-    if (!photoResponse.ok) {
-      return Response.json(
-        { error: "Could not load photo media" },
-        { status: 502 }
-      );
-    }
-
-    const photoData = await photoResponse.json();
 
     if (!photoData?.photoUri) {
       return Response.json(
@@ -97,10 +146,11 @@ export async function GET(request) {
 
     return Response.json({
       url: photoData.photoUri,
+      placeId,
       attribution:
         photo.authorAttributions?.[0]?.displayName || null,
       attributionUri:
-        photo.authorAttributions?.[0]?.uri || null
+        photo.authorAttributions?.[0]?.uri || null,
     });
   } catch {
     return Response.json(
