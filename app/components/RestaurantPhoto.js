@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 export default function RestaurantPhoto({
   placeId,
+  restaurantName,
   photoIndex = 0,
   alt,
 }) {
@@ -13,7 +14,7 @@ export default function RestaurantPhoto({
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (!placeId) return;
+    if (!placeId && !restaurantName) return;
 
     const element = wrapperRef.current;
     if (!element) return;
@@ -35,19 +36,27 @@ export default function RestaurantPhoto({
     observer.observe(element);
 
     return () => observer.disconnect();
-  }, [placeId]);
+  }, [placeId, restaurantName]);
 
   useEffect(() => {
-    if (!shouldLoad || !placeId) return;
+    if (!shouldLoad) return;
 
     let cancelled = false;
 
     async function loadPhoto() {
       try {
+        const params = new URLSearchParams();
+
+        if (placeId) {
+          params.set("placeId", placeId);
+        } else if (restaurantName) {
+          params.set("name", restaurantName);
+        }
+
+        params.set("index", String(photoIndex));
+
         const response = await fetch(
-          `/api/place-photo?placeId=${encodeURIComponent(
-            placeId
-          )}&index=${photoIndex}`
+          `/api/place-photo?${params.toString()}`
         );
 
         if (!response.ok) {
@@ -73,9 +82,9 @@ export default function RestaurantPhoto({
     return () => {
       cancelled = true;
     };
-  }, [shouldLoad, placeId, photoIndex]);
+  }, [shouldLoad, placeId, restaurantName, photoIndex]);
 
-  if (!placeId || failed) {
+  if ((!placeId && !restaurantName) || failed) {
     return null;
   }
 
