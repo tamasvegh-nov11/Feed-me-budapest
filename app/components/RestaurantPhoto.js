@@ -9,13 +9,13 @@ export default function RestaurantPhoto({
 }) {
   const wrapperRef = useRef(null);
   const [shouldLoad, setShouldLoad] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState("");
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!placeId) return;
 
     const element = wrapperRef.current;
-
     if (!element) return;
 
     const observer = new IntersectionObserver(
@@ -37,19 +37,53 @@ export default function RestaurantPhoto({
     return () => observer.disconnect();
   }, [placeId]);
 
+  useEffect(() => {
+    if (!shouldLoad || !placeId) return;
+
+    let cancelled = false;
+
+    async function loadPhoto() {
+      try {
+        const response = await fetch(
+          `/api/place-photo?placeId=${encodeURIComponent(
+            placeId
+          )}&index=${photoIndex}`
+        );
+
+        if (!response.ok) {
+          throw new Error("Photo request failed");
+        }
+
+        const data = await response.json();
+
+        if (!cancelled && data?.url) {
+          setPhotoUrl(data.url);
+        } else if (!cancelled) {
+          setFailed(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setFailed(true);
+        }
+      }
+    }
+
+    loadPhoto();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [shouldLoad, placeId, photoIndex]);
+
   if (!placeId || failed) {
     return null;
   }
 
-  const src = `/api/place-photo?placeId=${encodeURIComponent(
-    placeId
-  )}&photoIndex=${photoIndex}`;
-
   return (
     <div ref={wrapperRef} className="restaurant-photo-wrap">
-      {shouldLoad && (
+      {photoUrl && (
         <img
-          src={src}
+          src={photoUrl}
           alt={alt || ""}
           className="restaurant-photo"
           loading="lazy"
