@@ -9,35 +9,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 );
 
-function weightedSample(items, count) {
-  const pool = [...items];
-  const selected = [];
-
-  while (pool.length > 0 && selected.length < count) {
-    const totalWeight = pool.reduce(
-      (sum, item) => sum + (item.recommendation_weight || 1),
-      0
-    );
-
-    let random = Math.random() * totalWeight;
-    let chosenIndex = 0;
-
-    for (let i = 0; i < pool.length; i++) {
-      random -= pool[i].recommendation_weight || 1;
-
-      if (random <= 0) {
-        chosenIndex = i;
-        break;
-      }
-    }
-
-    selected.push(pool[chosenIndex]);
-    pool.splice(chosenIndex, 1);
-  }
-
-  return selected;
-}
-
 export default function Home() {
   const [landmarks, setLandmarks] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -62,6 +33,7 @@ export default function Home() {
       const { data: categoryData } = await supabase
         .from("feed_categories")
         .select("id,name")
+        .neq("id", "CAT12")
         .order("name");
 
       setLandmarks(landmarkData || []);
@@ -81,8 +53,6 @@ export default function Home() {
     setError("");
     setSearched(true);
     setResults([]);
-
-    const surpriseMe = category === "CAT12";
 
     let relationQuery = supabase
       .from("feed_landmark_relations")
@@ -112,7 +82,7 @@ export default function Home() {
 
     let eligibleRelations = relationData;
 
-    if (category && !surpriseMe) {
+    if (category) {
       const ids = relationData.map((item) => item.restaurant_id);
 
       const { data: categoryLinks, error: categoryError } =
@@ -161,39 +131,121 @@ export default function Home() {
       return;
     }
 
-    const distanceMap = {};
+    const { data: categoryMapData, error: categoryMapError } =
+      await supabase
+        .from("feed_restaurant_categories")
+        .select("restaurant_id,category_id")
+        .in("restaurant_id", eligibleIds);
 
+    if (categoryMapError) {
+      setError("We couldn't load recommendations. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    const distanceMap = {};
     eligibleRelations.forEach((item) => {
       distanceMap[item.restaurant_id] = item.public_distance;
     });
 
-    let finalResults = (restaurantData || []).map((restaurant) => ({
+    const categoriesByRestaurant = {};
+    (categoryMapData || []).forEach((item) => {
+      if (!categoriesByRestaurant[item.restaurant_id]) {
+        categoriesByRestaurant[item.restaurant_id] = [];
+      }
+
+      categoriesByRestaurant[item.restaurant_id].push(item.category_id);
+    });
+
+    let candidates = (restaurantData || []).map((restaurant) => ({
       ...restaurant,
       public_distance: distanceMap[restaurant.id],
+      category_ids: categoriesByRestaurant[restaurant.id] || [],
     }));
 
-    if (surpriseMe) {
-      finalResults = weightedSample(finalResults, 3);
+    candidates.sort((a, b) => {
+      if (
+        a.public_distance === "Within 10 min" &&
+        b.public_distance !== "Within 10 min"
+      ) {
+        return -1;
+      }
+
+      if (
+        b.public_distance === "Within 10 min" &&
+        a.public_distance !== "Within 10 min"
+      ) {
+        return 1;
+      }
+
+      const confidenceOrder = {
+        "Very High": 4,
+        High: 3,
+        Medium: 2,
+        Low: 1,
+      };
+
+      const confidenceDiff =
+        (confidenceOrder[b.confidence] || 0) -
+        (confidenceOrder[a.confidence] || 0);
+
+      if (confidenceDiff !== 0) {
+        return confidenceDiff;
+      }
+
+      return a.name.localeCompare(b.name);
+    });
+
+    let finalResults = [];
+
+    if (category) {
+      finalResults = candidates.slice(0, 3);
     } else {
-      finalResults.sort((a, b) => {
-        if (
-          a.public_distance === "Within 10 min" &&
-          b.public_distance !== "Within 10 min"
-        ) {
-          return -1;
+      const usedRestaurants = new Set();
+      const coveredCategories = new Set();
+
+      const usableCategoryIds = new Set(
+        categories
+          .map((item) => item.id)
+          .filter((id) => id !== "CAT12")
+      );
+
+      for (const restaurant of candidates) {
+        const newCategory = restaurant.category_ids.find(
+          (categoryId) =>
+            usableCategoryIds.has(categoryId) &&
+            !coveredCategories.has(categoryId)
+        );
+
+        if (newCategory) {
+          finalResults.push(restaurant);
+          usedRestaurants.add(restaurant.id);
+
+          restaurant.category_ids.forEach((categoryId) => {
+            if (usableCategoryIds.has(categoryId)) {
+              coveredCategories.add(categoryId);
+            }
+          });
         }
 
         if (
-          b.public_distance === "Within 10 min" &&
-          a.public_distance !== "Within 10 min"
+          finalResults.length >= 3 &&
+          coveredCategories.size >= 3
         ) {
-          return 1;
+          break;
+        }
+      }
+
+      for (const restaurant of candidates) {
+        if (finalResults.length >= 5) {
+          break;
         }
 
-        return a.name.localeCompare(b.name);
-      });
-
-      finalResults = finalResults.slice(0, 5);
+        if (!usedRestaurants.has(restaurant.id)) {
+          finalResults.push(restaurant);
+          usedRestaurants.add(restaurant.id);
+        }
+      }
     }
 
     setResults(finalResults);
@@ -301,23 +353,19 @@ export default function Home() {
 
       {searched && (
         <section id="results" className="results-section">
-          <p className="eyebrow">
-            {category === "CAT12" ? "SURPRISE ME" : "YOUR PICKS"}
-          </p>
+          <p className="eyebrow">YOUR PICKS</p>
 
           <h2>
             {results.length
-              ? category === "CAT12"
-                ? "Three places. No overthinking."
-                : "Places we'd recommend"
+              ? "Places we'd recommend"
               : "Nothing we'd confidently recommend here yet."}
           </h2>
 
           {results.length > 0 && (
             <p className="results-intro">
-              {category === "CAT12"
-                ? "We picked three good options for you. Pick one and go."
-                : "A small selection based on your choices — not an endless list of everything nearby."}
+              {category
+                ? "A short list based on exactly what you feel like."
+                : "A varied selection of good places nearby — not an endless list of everything around you."}
             </p>
           )}
 
@@ -375,7 +423,8 @@ export default function Home() {
           <p>
             Feed Me doesn't show you every restaurant nearby. We start
             with places we'd actually recommend, then match them to where
-            you're going, what you want and how far you're willing to walk.
+            you're going, what you want and how far you're willing to
+            walk.
           </p>
 
           <Link href="/how-it-works" className="text-link">
