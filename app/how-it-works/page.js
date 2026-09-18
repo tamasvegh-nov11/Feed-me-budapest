@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export default function HowItWorks() {
+export default function HowItWorksPage() {
   return (
     <main>
       <header className="header">
@@ -11,6 +11,7 @@ export default function HowItWorks() {
         <nav>
           <Link href="/how-it-works">How it works</Link>
           <Link href="/about">About</Link>
+          <Link href="/contact">Contact</Link>
         </nav>
       </header>
 
@@ -25,116 +26,146 @@ export default function HowItWorks() {
           </h1>
 
           <p className="how-lead">
-            Feed Me Budapest is built for travellers who already know what
-            they want to see — but do not want to spend twenty minutes
-            comparing restaurant lists nearby.
+            Feed Me Budapest is designed for one simple situation:
+            you already know where you are going in the city, but you
+            do not want to spend the next twenty minutes comparing
+            restaurant lists.
           </p>
 
           <div className="how-sections">
             <section>
               <span>01</span>
+
               <h2>Choose a landmark</h2>
+
               <p>
-                Start with the Budapest sight you are visiting. We use fixed
-                landmark zones instead of your exact location so the results
-                stay simple, predictable and reliable.
+                Start with the Budapest sight, square or attraction
+                you are visiting.
+              </p>
+
+              <p>
+                We connect restaurants to specific landmarks rather
+                than showing you an enormous city-wide list.
               </p>
             </section>
 
             <section>
               <span>02</span>
+
               <h2>Tell us what you feel like</h2>
+
               <p>
-                Pick a food or drink category — Hungarian, pizza, brunch,
-                coffee, drinks and more — or leave it open if you simply want
-                something good.
+                Choose a category if you already know what you want,
+                or leave it on Anything good if you would rather see
+                a varied selection.
               </p>
             </section>
 
             <section>
               <span>03</span>
-              <h2>Choose how far you want to walk</h2>
+
+              <h2>Choose your walking distance</h2>
+
               <p>
-                We show two simple options: up to 10 minutes or up to 15
-                minutes.
+                You can limit recommendations to places within roughly
+                10 minutes or expand the search to around 15 minutes.
               </p>
+
               <p>
-                Our walking distances are intentionally conservative. Internally
-                we use shorter distance bands so the walk should usually feel
-                shorter than the label, not longer.
+                We intentionally use conservative distance bands rather
+                than promising unrealistically short walks.
               </p>
             </section>
 
             <section>
               <span>04</span>
-              <h2>We only show places we would actually recommend</h2>
+
+              <h2>We narrow it down</h2>
+
               <p>
-                Feed Me is not a directory. We do not list every restaurant
-                near a landmark, and we do not lower the standard just to fill
-                a category.
+                Feed Me does not try to show every possible restaurant.
               </p>
+
               <p>
-                If there is no place nearby that clears our quality threshold,
-                we would rather show no result than send you somewhere weak.
+                A specific category returns a short list of up to three
+                places. Anything good can return up to five and aims to
+                include different types of places where possible.
               </p>
             </section>
 
             <section>
               <span>05</span>
-              <h2>What we look at</h2>
+
+              <h2>We check whether the place is open</h2>
+
               <p>
-                We consider food quality, service and atmosphere, consistency,
-                value for money, local credibility and tourist-trap risk.
+                Closed restaurants are normally filtered out using
+                current opening-hour information.
               </p>
+
               <p>
-                Public ratings matter, but a high score alone is not enough.
-                We also look at review patterns, the size of the review history
-                and recurring complaints.
+                A place opening within 30 minutes can still appear as
+                Opening soon. A restaurant closing within 30 minutes
+                can be shown with a Closing soon notice.
               </p>
             </section>
 
             <section>
               <span>06</span>
-              <h2>Made for spontaneous plans</h2>
+
+              <h2>Some places receive extra weight</h2>
+
               <p>
-                The idea is simple: you should have a realistic chance of just
-                walking in.
+                Recommendation logic can include editorial weighting,
+                but that does not mean paid placement.
               </p>
+
               <p>
-                We generally avoid restaurants that normally require advance
-                booking. At very popular places, peak times can still be busy,
-                so some recommendations are marked accordingly.
+                Restaurants cannot purchase a higher position in the
+                results.
               </p>
             </section>
 
             <section>
               <span>07</span>
-              <h2>No paid ranking</h2>
+
+              <h2>We keep reviewing the guide</h2>
+
               <p>
-                Restaurants cannot pay for a better Feed Me position.
+                Recommendations, landmark connections and supporting
+                information are reviewed every month.
               </p>
+
               <p>
-                The recommendations are selected independently. The point of the
-                site is to reduce choice, not sell placement.
+                Restaurants can be added or removed as places open,
+                close or change.
               </p>
             </section>
 
             <section>
               <span>08</span>
-              <h2>Then Google Maps takes over</h2>
+
+              <h2>AI helps build the system</h2>
+
               <p>
-                Feed Me helps you decide where to go. When you choose a place,
-                GET DIRECTIONS opens Google Maps so you can navigate there
-                normally.
+                Feed Me Budapest was built with the help of AI for
+                research assistance, data processing, technical
+                development and editorial support.
+              </p>
+
+              <p>
+                Selection criteria, recommendation rules and editorial
+                decisions are human-reviewed.
               </p>
             </section>
           </div>
 
           <div className="how-cta">
-            <h2>Ready?</h2>
+            <h2>Ready to try it?</h2>
+
             <p>
-              Pick a landmark, choose what you feel like and let Feed Me narrow
-              it down.
+              Choose where you are going, what you feel like and how
+              far you are willing to walk.
             </p>
 
             <Link href="/" className="feed-button how-home-button">
