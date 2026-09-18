@@ -35,7 +35,6 @@ export default function HowItWorksPage() {
           <div className="how-sections">
             <section>
               <span>01</span>
-
               <h2>Choose a landmark</h2>
 
               <p>
@@ -51,7 +50,6 @@ export default function HowItWorksPage() {
 
             <section>
               <span>02</span>
-
               <h2>Tell us what you feel like</h2>
 
               <p>
@@ -63,7 +61,6 @@ export default function HowItWorksPage() {
 
             <section>
               <span>03</span>
-
               <h2>Choose your walking distance</h2>
 
               <p>
@@ -79,7 +76,6 @@ export default function HowItWorksPage() {
 
             <section>
               <span>04</span>
-
               <h2>We narrow it down</h2>
 
               <p>
@@ -95,7 +91,6 @@ export default function HowItWorksPage() {
 
             <section>
               <span>05</span>
-
               <h2>We check whether the place is open</h2>
 
               <p>
@@ -112,7 +107,6 @@ export default function HowItWorksPage() {
 
             <section>
               <span>06</span>
-
               <h2>Some places receive extra weight</h2>
 
               <p>
@@ -128,7 +122,6 @@ export default function HowItWorksPage() {
 
             <section>
               <span>07</span>
-
               <h2>We keep reviewing the guide</h2>
 
               <p>
@@ -144,7 +137,6 @@ export default function HowItWorksPage() {
 
             <section>
               <span>08</span>
-
               <h2>AI helps build the system</h2>
 
               <p>
