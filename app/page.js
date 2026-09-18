@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
+import RestaurantPhoto from "./components/RestaurantPhoto";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -10,7 +11,7 @@ const supabase = createClient(
 );
 
 const featuredRestaurants = new Set([
-  "R001", // Salve Pizza Napoletana Basilica
+  "R001", // Salve
   "R079", // Kontakt
   "R080", // Szimply
 ]);
@@ -126,7 +127,19 @@ export default function Home() {
       await supabase
         .from("feed_restaurants")
         .select(
-          "id,name,status,walk_in,confidence,why_we_like_it,good_to_know,primary_area,recommendation_weight"
+          `
+          id,
+          name,
+          status,
+          walk_in,
+          confidence,
+          why_we_like_it,
+          good_to_know,
+          primary_area,
+          recommendation_weight,
+          google_place_id,
+          google_photo_index
+          `
         )
         .eq("active", true)
         .in("id", eligibleIds);
@@ -394,38 +407,46 @@ export default function Home() {
           <div className="results-grid">
             {results.map((restaurant) => (
               <article className="result-card" key={restaurant.id}>
-                <div className="result-top">
-                  <span>{restaurant.public_distance}</span>
+                <RestaurantPhoto
+                  placeId={restaurant.google_place_id}
+                  photoIndex={restaurant.google_photo_index || 0}
+                  alt={restaurant.name}
+                />
 
-                  {restaurant.status === "Approved - Peak Check" && (
-                    <span>Peak times may be busy</span>
+                <div className="result-card-body">
+                  <div className="result-top">
+                    <span>{restaurant.public_distance}</span>
+
+                    {restaurant.status === "Approved - Peak Check" && (
+                      <span>Peak times may be busy</span>
+                    )}
+                  </div>
+
+                  <h3>{restaurant.name}</h3>
+
+                  {restaurant.why_we_like_it && (
+                    <div className="result-copy">
+                      <strong>Why we like it</strong>
+                      <p>{restaurant.why_we_like_it}</p>
+                    </div>
                   )}
+
+                  {restaurant.good_to_know && (
+                    <div className="result-copy">
+                      <strong>Good to know</strong>
+                      <p>{restaurant.good_to_know}</p>
+                    </div>
+                  )}
+
+                  <a
+                    className="directions-link"
+                    href={googleMapsLink(restaurant.name)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    GET DIRECTIONS →
+                  </a>
                 </div>
-
-                <h3>{restaurant.name}</h3>
-
-                {restaurant.why_we_like_it && (
-                  <div className="result-copy">
-                    <strong>Why we like it</strong>
-                    <p>{restaurant.why_we_like_it}</p>
-                  </div>
-                )}
-
-                {restaurant.good_to_know && (
-                  <div className="result-copy">
-                    <strong>Good to know</strong>
-                    <p>{restaurant.good_to_know}</p>
-                  </div>
-                )}
-
-                <a
-                  className="directions-link"
-                  href={googleMapsLink(restaurant.name)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  GET DIRECTIONS →
-                </a>
               </article>
             ))}
           </div>
