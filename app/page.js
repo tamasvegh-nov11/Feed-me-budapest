@@ -367,6 +367,7 @@ export default function Home() {
         <nav>
           <Link href="/how-it-works">How it works</Link>
           <Link href="/about">About</Link>
+          <Link href="/contact">Contact</Link>
         </nav>
       </header>
 
