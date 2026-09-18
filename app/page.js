@@ -50,6 +50,41 @@ export default function Home() {
     loadFilters();
   }, []);
 
+  async function getLiveStatus(restaurant) {
+    try {
+      const params = new URLSearchParams();
+
+      if (restaurant.google_place_id) {
+        params.set("placeId", restaurant.google_place_id);
+      } else {
+        params.set("name", restaurant.name);
+      }
+
+      const response = await fetch(
+        `/api/place-status?${params.toString()}`,
+        {
+          cache: "no-store",
+        }
+      );
+
+      if (!response.ok) {
+        return {
+          recommendable: true,
+          status: "unknown",
+          label: null,
+        };
+      }
+
+      return await response.json();
+    } catch {
+      return {
+        recommendable: true,
+        status: "unknown",
+        label: null,
+      };
+    }
+  }
+
   async function findPlaces() {
     if (!landmark) {
       setError("Please choose a Budapest landmark first.");
@@ -163,24 +198,47 @@ export default function Home() {
     }
 
     const distanceMap = {};
+
     eligibleRelations.forEach((item) => {
       distanceMap[item.restaurant_id] = item.public_distance;
     });
 
     const categoriesByRestaurant = {};
+
     (categoryMapData || []).forEach((item) => {
       if (!categoriesByRestaurant[item.restaurant_id]) {
         categoriesByRestaurant[item.restaurant_id] = [];
       }
 
-      categoriesByRestaurant[item.restaurant_id].push(item.category_id);
+      categoriesByRestaurant[item.restaurant_id].push(
+        item.category_id
+      );
     });
 
     let candidates = (restaurantData || []).map((restaurant) => ({
       ...restaurant,
       public_distance: distanceMap[restaurant.id],
-      category_ids: categoriesByRestaurant[restaurant.id] || [],
+      category_ids:
+        categoriesByRestaurant[restaurant.id] || [],
     }));
+
+    const liveStatuses = await Promise.all(
+      candidates.map(async (restaurant) => {
+        const liveStatus = await getLiveStatus(restaurant);
+
+        return {
+          ...restaurant,
+          live_status: liveStatus.status || "unknown",
+          live_label: liveStatus.label || null,
+          live_recommendable:
+            liveStatus.recommendable !== false,
+        };
+      })
+    );
+
+    candidates = liveStatuses.filter(
+      (restaurant) => restaurant.live_recommendable
+    );
 
     candidates.sort((a, b) => {
       const aFeatured = featuredRestaurants.has(a.id);
@@ -321,9 +379,9 @@ export default function Home() {
           </h1>
 
           <p className="intro">
-            Choose a Budapest landmark, tell us what you feel like eating
-            and how far you're willing to walk. We'll show you a small
-            selection of places we'd actually recommend.
+            Choose a Budapest landmark, tell us what you feel like
+            eating and how far you're willing to walk. We'll show you
+            a small selection of places we'd actually recommend.
           </p>
 
           <div className="finder">
@@ -393,7 +451,7 @@ export default function Home() {
           <h2>
             {results.length
               ? "Places we'd recommend"
-              : "Nothing we'd confidently recommend here yet."}
+              : "Nothing we'd confidently recommend here right now."}
           </h2>
 
           {results.length > 0 && (
@@ -406,10 +464,15 @@ export default function Home() {
 
           <div className="results-grid">
             {results.map((restaurant) => (
-              <article className="result-card" key={restaurant.id}>
+              <article
+                className="result-card"
+                key={restaurant.id}
+              >
                 <RestaurantPhoto
                   placeId={restaurant.google_place_id}
-                  photoIndex={restaurant.google_photo_index || 0}
+                  photoIndex={
+                    restaurant.google_photo_index || 0
+                  }
                   alt={restaurant.name}
                 />
 
@@ -417,9 +480,18 @@ export default function Home() {
                   <div className="result-top">
                     <span>{restaurant.public_distance}</span>
 
-                    {restaurant.status === "Approved - Peak Check" && (
-                      <span>Peak times may be busy</span>
-                    )}
+                    <div className="result-statuses">
+                      {restaurant.live_label && (
+                        <span className="live-status">
+                          {restaurant.live_label}
+                        </span>
+                      )}
+
+                      {restaurant.status ===
+                        "Approved - Peak Check" && (
+                        <span>Peak times may be busy</span>
+                      )}
+                    </div>
                   </div>
 
                   <h3>{restaurant.name}</h3>
@@ -465,8 +537,9 @@ export default function Home() {
 
           <p>
             Feed Me doesn't show you every restaurant nearby. We start
-            with places we'd actually recommend, then match them to where
-            you're going, what you want and how far you're willing to walk.
+            with places we'd actually recommend, then match them to
+            where you're going, what you want and how far you're
+            willing to walk.
           </p>
 
           <Link href="/how-it-works" className="text-link">
@@ -496,7 +569,9 @@ export default function Home() {
           <div>
             <span>04</span>
             <strong>We do the rest</strong>
-            <p>A small selection of places we'd actually recommend.</p>
+            <p>
+              A small selection of places we'd actually recommend.
+            </p>
           </div>
         </div>
       </section>
@@ -522,7 +597,8 @@ export default function Home() {
         <strong>Feed Me Budapest</strong>
 
         <span>
-          Sightseeing is easy. Finding somewhere good to eat nearby isn't.
+          Sightseeing is easy. Finding somewhere good to eat nearby
+          isn't.
         </span>
       </footer>
     </main>
