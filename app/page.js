@@ -9,6 +9,12 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 );
 
+const featuredRestaurants = new Set([
+  "R001", // Salve Pizza Napoletana Basilica
+  "R079", // Kontakt
+  "R080", // Szimply
+]);
+
 export default function Home() {
   const [landmarks, setLandmarks] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -164,6 +170,12 @@ export default function Home() {
     }));
 
     candidates.sort((a, b) => {
+      const aFeatured = featuredRestaurants.has(a.id);
+      const bFeatured = featuredRestaurants.has(b.id);
+
+      if (aFeatured && !bFeatured) return -1;
+      if (!aFeatured && bFeatured) return 1;
+
       if (
         a.public_distance === "Within 10 min" &&
         b.public_distance !== "Within 10 min"
@@ -247,6 +259,16 @@ export default function Home() {
         }
       }
     }
+
+    finalResults.sort((a, b) => {
+      const aFeatured = featuredRestaurants.has(a.id);
+      const bFeatured = featuredRestaurants.has(b.id);
+
+      if (aFeatured && !bFeatured) return -1;
+      if (!aFeatured && bFeatured) return 1;
+
+      return 0;
+    });
 
     setResults(finalResults);
     setLoading(false);
@@ -423,8 +445,7 @@ export default function Home() {
           <p>
             Feed Me doesn't show you every restaurant nearby. We start
             with places we'd actually recommend, then match them to where
-            you're going, what you want and how far you're willing to
-            walk.
+            you're going, what you want and how far you're willing to walk.
           </p>
 
           <Link href="/how-it-works" className="text-link">
