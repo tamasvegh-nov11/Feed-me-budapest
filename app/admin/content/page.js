@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const VERSION = "FMB-ADMIN-V6";
+const VERSION = "FMB-ADMIN-V7";
 
 const STATUS_LABELS = {
   ready_for_review: "Pending",
@@ -142,6 +142,65 @@ export default function ContentAdminPage() {
 
       setSelected(null);
       await loadContent(adminKey);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unknown error"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function preparePhotos(id) {
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/content", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          adminKey,
+          id,
+          action: "prepare_photos",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Could not prepare photos."
+        );
+      }
+
+      const preparedCount =
+        Array.isArray(data.prepared)
+          ? data.prepared.length
+          : 0;
+
+      const errorCount =
+        Array.isArray(data.errors)
+          ? data.errors.length
+          : 0;
+
+      setMessage(
+        errorCount > 0
+          ? `Photos prepared: ${preparedCount}. Some images failed: ${errorCount}.`
+          : `✓ ${preparedCount} restaurant photos prepared successfully.`
+      );
+
+      await loadContent(adminKey);
+
+      const refreshedItem = data.item || null;
+
+      if (refreshedItem) {
+        setSelected(refreshedItem);
+      }
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -480,43 +539,52 @@ export default function ContentAdminPage() {
                   </section>
                 )}
 
-                {selected.status ===
-                  "ready_for_review" && (
-                  <div style={styles.actions}>
-                    <button
-                      onClick={() =>
-                        changeStatus(
-                          selected.id,
-                          "approved"
-                        )
-                      }
-                      style={styles.approve}
-                    >
-                      ✓ Approve
-                    </button>
+                {selected.status === "ready_for_review" && (
+                  <>
+                    <div style={styles.actions}>
+                      <button
+                        onClick={() =>
+                          preparePhotos(selected.id)
+                        }
+                        style={styles.prepare}
+                      >
+                        Prepare photos
+                      </button>
+                    </div>
 
-                    <button
-                      onClick={() =>
-                        changeStatus(
-                          selected.id,
-                          "rejected"
-                        )
-                      }
-                      style={styles.reject}
-                    >
-                      Reject
-                    </button>
-                  </div>
+                    <div style={styles.actions}>
+                      <button
+                        onClick={() =>
+                          changeStatus(
+                            selected.id,
+                            "approved"
+                          )
+                        }
+                        style={styles.approve}
+                      >
+                        ✓ Approve
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          changeStatus(
+                            selected.id,
+                            "rejected"
+                          )
+                        }
+                        style={styles.reject}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </>
                 )}
 
-                {selected.status ===
-                  "scheduled" && (
+                {selected.status === "scheduled" && (
                   <div style={styles.actions}>
                     <button
                       onClick={() =>
-                        cancelSchedule(
-                          selected.id
-                        )
+                        cancelSchedule(selected.id)
                       }
                       style={styles.cancel}
                     >
@@ -859,8 +927,18 @@ const styles = {
   actions: {
     display: "flex",
     gap: 12,
-    marginTop: 30,
+    marginTop: 20,
     flexWrap: "wrap",
+  },
+
+  prepare: {
+    width: "100%",
+    border: `1px solid ${green}`,
+    background: "#eef3ef",
+    color: green,
+    padding: 15,
+    borderRadius: 12,
+    fontWeight: 700,
   },
 
   approve: {
