@@ -12,36 +12,108 @@ function safeName(value = "") {
     .slice(0, 80);
 }
 
-async function getImageFromSource(sourceUrl) {
-  const response = await fetch(sourceUrl, {
+async function fetchActualImage(sourceUrl) {
+  /*
+    STEP 1:
+    Fetch the supplied source.
+    This may already be an image,
+    OR it may be our /api/place-photo JSON response.
+  */
+
+  const sourceResponse = await fetch(sourceUrl, {
     redirect: "follow",
     cache: "no-store",
   });
 
-  if (!response.ok) {
+  if (!sourceResponse.ok) {
     throw new Error(
-      `Source returned HTTP ${response.status}`
+      `Source returned HTTP ${sourceResponse.status}`
     );
   }
 
-  const contentType =
-    response.headers.get("content-type") || "";
+  const sourceContentType =
+    sourceResponse.headers.get("content-type") || "";
 
-  if (!contentType.startsWith("image/")) {
-    throw new Error(
-      `Source did not return an image. Content-Type: ${
-        contentType || "unknown"
-      }`
-    );
+  /*
+    CASE A:
+    Source already returned an image.
+  */
+
+  if (sourceContentType.startsWith("image/")) {
+    const arrayBuffer =
+      await sourceResponse.arrayBuffer();
+
+    return {
+      bytes: new Uint8Array(arrayBuffer),
+      contentType: sourceContentType,
+      finalSourceUrl: sourceUrl,
+      attribution: null,
+      attributionUri: null,
+    };
   }
 
-  const arrayBuffer =
-    await response.arrayBuffer();
+  /*
+    CASE B:
+    Our place-photo endpoint returned JSON
+    containing the real Google photo URL.
+  */
 
-  return {
-    bytes: new Uint8Array(arrayBuffer),
-    contentType,
-  };
+  if (sourceContentType.includes("application/json")) {
+    const sourceData =
+      await sourceResponse.json();
+
+    if (!sourceData?.url) {
+      throw new Error(
+        sourceData?.error ||
+          "Photo JSON did not contain a URL."
+      );
+    }
+
+    const actualPhotoUrl =
+      sourceData.url;
+
+    const imageResponse =
+      await fetch(actualPhotoUrl, {
+        redirect: "follow",
+        cache: "no-store",
+      });
+
+    if (!imageResponse.ok) {
+      throw new Error(
+        `Google photo returned HTTP ${imageResponse.status}`
+      );
+    }
+
+    const imageContentType =
+      imageResponse.headers.get("content-type") || "";
+
+    if (!imageContentType.startsWith("image/")) {
+      throw new Error(
+        `Google photo did not return an image. Content-Type: ${
+          imageContentType || "unknown"
+        }`
+      );
+    }
+
+    const arrayBuffer =
+      await imageResponse.arrayBuffer();
+
+    return {
+      bytes: new Uint8Array(arrayBuffer),
+      contentType: imageContentType,
+      finalSourceUrl: actualPhotoUrl,
+      attribution:
+        sourceData.attribution || null,
+      attributionUri:
+        sourceData.attributionUri || null,
+    };
+  }
+
+  throw new Error(
+    `Unsupported source Content-Type: ${
+      sourceContentType || "unknown"
+    }`
+  );
 }
 
 async function uploadToSupabase({
@@ -73,7 +145,9 @@ async function uploadToSupabase({
     );
   }
 
-  return `${SUPABASE_URL}/storage/v1/object/public/feed-media/${path}`;
+  return (
+    `${SUPABASE_URL}/storage/v1/object/public/feed-media/${path}`
+  );
 }
 
 export async function POST(request) {
@@ -92,7 +166,8 @@ export async function POST(request) {
       );
     }
 
-    const body = await request.json();
+    const body =
+      await request.json();
 
     const sourceUrlRaw =
       body?.sourceUrl?.trim();
@@ -133,18 +208,21 @@ export async function POST(request) {
     }
 
     /*
-      This is the important fix:
-      relative URLs like /api/place-photo?... are
-      converted into a full URL automatically.
+      Convert relative URL into full URL.
     */
+
     const sourceUrl =
       new URL(
         sourceUrlRaw,
         request.url
       ).toString();
 
+    /*
+      Get the real image bytes.
+    */
+
     const image =
-      await getImageFromSource(
+      await fetchActualImage(
         sourceUrl
       );
 
@@ -158,6 +236,10 @@ export async function POST(request) {
       image.contentType.includes("webp")
     ) {
       extension = "webp";
+    } else if (
+      image.contentType.includes("jpeg")
+    ) {
+      extension = "jpg";
     }
 
     const base =
@@ -179,21 +261,34 @@ export async function POST(request) {
 
     return Response.json({
       ok: true,
+
       restaurantId:
         restaurantId || null,
+
       restaurantName:
         restaurantName || null,
+
       photoIndex,
-      sourceUrl,
-      storagePath: path,
+
+      storagePath:
+        path,
+
       publicUrl,
+
       contentType:
         image.contentType,
+
+      attribution:
+        image.attribution,
+
+      attributionUri:
+        image.attributionUri,
     });
   } catch (error) {
     return Response.json(
       {
         ok: false,
+
         error:
           error instanceof Error
             ? error.message
