@@ -32,6 +32,12 @@ export default function PhotoPickerPage() {
   const [slideUrl, setSlideUrl] = useState("");
   const [slideLoading, setSlideLoading] = useState(false);
 
+  const [buildingCarousel, setBuildingCarousel] =
+    useState(false);
+
+  const [carouselResult, setCarouselResult] =
+    useState(null);
+
   const [error, setError] = useState("");
 
   const restaurant =
@@ -64,13 +70,9 @@ export default function PhotoPickerPage() {
               }
             );
 
-            const data =
-              await response.json();
+            const data = await response.json();
 
-            if (
-              !response.ok ||
-              !data?.url
-            ) {
+            if (!response.ok || !data?.url) {
               return {
                 index,
                 url: null,
@@ -84,11 +86,9 @@ export default function PhotoPickerPage() {
               index,
               url: data.url,
               attribution:
-                data.attribution ||
-                null,
+                data.attribution || null,
               attributionUri:
-                data.attributionUri ||
-                null,
+                data.attributionUri || null,
             };
           }
         )
@@ -106,9 +106,7 @@ export default function PhotoPickerPage() {
     }
   }
 
-  async function buildSlide(
-    publicUrl
-  ) {
+  async function buildSlide(publicUrl) {
     setSlideLoading(true);
     setSlideUrl("");
     setError("");
@@ -225,6 +223,45 @@ export default function PhotoPickerPage() {
     }
   }
 
+  async function buildPizzaCarousel() {
+    setBuildingCarousel(true);
+    setCarouselResult(null);
+    setError("");
+
+    try {
+      const response = await fetch(
+        "/api/build-pizza-carousel",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            "Could not build pizza carousel."
+        );
+      }
+
+      setCarouselResult(data);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not build pizza carousel."
+      );
+    } finally {
+      setBuildingCarousel(false);
+    }
+  }
+
   return (
     <main style={styles.page}>
       <div style={styles.header}>
@@ -289,9 +326,9 @@ export default function PhotoPickerPage() {
           >
             Photo #
             {selected.index + 1} for{" "}
-            {restaurant.name} is now
-            stored in Feed Me Budapest
-            media storage.
+            {restaurant.name} is stored
+            in Feed Me Budapest media
+            storage.
           </div>
         </div>
       )}
@@ -348,9 +385,7 @@ export default function PhotoPickerPage() {
           {photos.map(
             (photo) => (
               <div
-                key={
-                  photo.index
-                }
+                key={photo.index}
                 style={
                   styles.card
                 }
@@ -436,6 +471,57 @@ export default function PhotoPickerPage() {
           )}
         </div>
       )}
+
+      <section style={styles.carouselSection}>
+        <div style={styles.eyebrow}>
+          PIZZA CAROUSEL
+        </div>
+
+        <h2 style={styles.carouselTitle}>
+          3 pizza spots to save in Budapest
+        </h2>
+
+        <p style={styles.carouselText}>
+          Uses the saved photo choices for Salve,
+          Belli di Mamma and Forni di Napoli,
+          generates the branded slides and creates
+          a new Pending carousel in the Content Dashboard.
+        </p>
+
+        <button
+          onClick={buildPizzaCarousel}
+          disabled={buildingCarousel}
+          style={{
+            ...styles.buildButton,
+            opacity:
+              buildingCarousel ? 0.6 : 1,
+          }}
+        >
+          {buildingCarousel
+            ? "Building carousel…"
+            : "Build pizza carousel"}
+        </button>
+
+        {carouselResult && (
+          <div style={styles.carouselSuccess}>
+            <strong>
+              ✓ Carousel created
+            </strong>
+
+            <div style={styles.successText}>
+              It has been added to the Content
+              Dashboard as Pending.
+            </div>
+
+            <a
+              href="/admin/content"
+              style={styles.dashboardLink}
+            >
+              Open Content Dashboard →
+            </a>
+          </div>
+        )}
+      </section>
     </main>
   );
 }
@@ -634,5 +720,55 @@ const styles = {
     justifyContent: "center",
     textAlign: "center",
     opacity: 0.45,
+  },
+
+  carouselSection: {
+    maxWidth: 1100,
+    margin: "50px auto 0",
+    background: "#fffdf7",
+    border:
+      "1px solid #ddd7ca",
+    borderRadius: 20,
+    padding: 24,
+  },
+
+  carouselTitle: {
+    fontFamily:
+      "Georgia, serif",
+    fontSize:
+      "clamp(28px,5vw,44px)",
+    margin: "8px 0 12px",
+  },
+
+  carouselText: {
+    lineHeight: 1.6,
+    opacity: 0.72,
+    maxWidth: 700,
+  },
+
+  buildButton: {
+    marginTop: 16,
+    border: "none",
+    background: green,
+    color: cream,
+    padding: "15px 22px",
+    borderRadius: 12,
+    fontWeight: 700,
+    fontSize: 16,
+  },
+
+  carouselSuccess: {
+    marginTop: 20,
+    background: "#e2ebdf",
+    padding: 16,
+    borderRadius: 14,
+  },
+
+  dashboardLink: {
+    display: "inline-block",
+    marginTop: 12,
+    color: green,
+    fontWeight: 700,
+    textDecoration: "none",
   },
 };
