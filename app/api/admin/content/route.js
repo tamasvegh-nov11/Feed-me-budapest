@@ -143,6 +143,7 @@ function instagramMetadata(contentType) {
       metadata: {
         instagram: {
           type: story
+          shouldShareToFeed: false
         }
       }
     `;
@@ -164,6 +165,7 @@ function instagramMetadata(contentType) {
       metadata: {
         instagram: {
           type: carousel
+          shouldShareToFeed: true
         }
       }
     `;
@@ -173,6 +175,7 @@ function instagramMetadata(contentType) {
     metadata: {
       instagram: {
         type: post
+        shouldShareToFeed: true
       }
     }
   `;
