@@ -34,6 +34,18 @@ async function getRestaurant(id) {
   return data[0];
 }
 
+function firstSentence(value = "") {
+  const text = String(value).trim();
+
+  if (!text) return "";
+
+  const match = text.match(/^.*?[.!?](?:\s|$)/);
+
+  return match
+    ? match[0].trim()
+    : text;
+}
+
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -61,6 +73,16 @@ export async function POST(request) {
     const restaurant =
       await getRestaurant(restaurantId);
 
+    const why =
+      firstSentence(
+        restaurant.why_we_like_it
+      );
+
+    const goodToKnow =
+      firstSentence(
+        restaurant.good_to_know
+      );
+
     return new ImageResponse(
       (
         <div
@@ -69,167 +91,180 @@ export async function POST(request) {
             height: "1350px",
             display: "flex",
             flexDirection: "column",
-            background: "#f7f3e8",
-            color: "#073b2d",
+            position: "relative",
+            overflow: "hidden",
+            background: "#073b2d",
+            color: "#f7f3e8",
             fontFamily: "Arial",
           }}
         >
+          {/* FULL HERO PHOTO */}
+          <img
+            src={photoUrl}
+            width="1080"
+            height="1000"
+            style={{
+              width: "1080px",
+              height: "1000px",
+              objectFit: "cover",
+            }}
+          />
+
+          {/* DARK PHOTO GRADIENT */}
           <div
             style={{
-              position: "relative",
+              position: "absolute",
+              left: 0,
+              top: 0,
               width: "1080px",
-              height: "760px",
+              height: "1000px",
               display: "flex",
+              background:
+                "linear-gradient(180deg, rgba(7,59,45,0.02) 35%, rgba(7,59,45,0.18) 58%, rgba(7,59,45,0.94) 100%)",
+            }}
+          />
+
+          {/* BRAND BADGE */}
+          <div
+            style={{
+              position: "absolute",
+              top: 44,
+              left: 48,
+              display: "flex",
+              padding: "12px 18px",
+              background: "#f7f3e8",
+              color: "#073b2d",
+              borderRadius: 30,
+              fontSize: 18,
+              fontWeight: 700,
+              letterSpacing: 3,
             }}
           >
-            <img
-              src={photoUrl}
-              width="1080"
-              height="760"
-              style={{
-                width: "1080px",
-                height: "760px",
-                objectFit: "cover",
-              }}
-            />
+            FEED ME BUDAPEST
+          </div>
 
+          {/* NUMBER / EDITORIAL LABEL */}
+          <div
+            style={{
+              position: "absolute",
+              top: 48,
+              right: 48,
+              display: "flex",
+              fontSize: 18,
+              letterSpacing: 2,
+              fontWeight: 700,
+              color: "#f7f3e8",
+            }}
+          >
+            PIZZA GUIDE
+          </div>
+
+          {/* RESTAURANT TITLE */}
+          <div
+            style={{
+              position: "absolute",
+              left: 50,
+              right: 50,
+              top: 660,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
             <div
               style={{
-                position: "absolute",
-                top: 40,
-                left: 48,
-                background: "#f7f3e8",
-                color: "#073b2d",
-                padding: "12px 18px",
-                borderRadius: 28,
-                fontSize: 18,
+                fontSize: 69,
                 fontWeight: 700,
-                letterSpacing: 3,
+                lineHeight: 0.98,
+                letterSpacing: -2,
+                maxWidth: "930px",
                 display: "flex",
               }}
             >
-              FEED ME BUDAPEST
+              {restaurant.name}
             </div>
 
-            <div
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                bottom: 0,
-                height: "240px",
-                background:
-                  "linear-gradient(180deg, rgba(7,59,45,0) 0%, rgba(7,59,45,0.92) 100%)",
-                display: "flex",
-              }}
-            />
+            {restaurant.primary_area && (
+              <div
+                style={{
+                  marginTop: 16,
+                  fontSize: 24,
+                  opacity: 0.92,
+                  display: "flex",
+                }}
+              >
+                {restaurant.primary_area} · Budapest
+              </div>
+            )}
 
+            {/* WHY WE LIKE IT */}
             <div
               style={{
-                position: "absolute",
-                left: 48,
-                right: 48,
-                bottom: 44,
+                marginTop: 28,
+                maxWidth: "900px",
                 display: "flex",
                 flexDirection: "column",
-                color: "#f7f3e8",
               }}
             >
               <div
                 style={{
-                  fontSize: 58,
+                  fontSize: 17,
+                  letterSpacing: 3,
                   fontWeight: 700,
-                  lineHeight: 1.02,
+                  marginBottom: 10,
                   display: "flex",
                 }}
               >
-                {restaurant.name}
+                WHY WE LIKE IT
               </div>
 
-              {restaurant.primary_area && (
-                <div
-                  style={{
-                    marginTop: 12,
-                    fontSize: 24,
-                    display: "flex",
-                  }}
-                >
-                  {restaurant.primary_area} · Budapest
-                </div>
-              )}
+              <div
+                style={{
+                  fontSize: 31,
+                  lineHeight: 1.18,
+                  fontWeight: 500,
+                  display: "flex",
+                }}
+              >
+                {why}
+              </div>
             </div>
           </div>
 
+          {/* BOTTOM EDITORIAL PANEL */}
           <div
             style={{
               width: "1080px",
-              height: "590px",
-              padding: "46px 52px 40px",
-              boxSizing: "border-box",
+              height: "350px",
+              background: "#f7f3e8",
+              color: "#073b2d",
               display: "flex",
               flexDirection: "column",
-              background: "#f7f3e8",
+              padding: "38px 50px 34px",
+              boxSizing: "border-box",
             }}
           >
             <div
               style={{
                 display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
                 width: "100%",
-                gap: 34,
+                gap: 30,
               }}
             >
               <div
                 style={{
-                  width: "60%",
                   display: "flex",
                   flexDirection: "column",
+                  width: "72%",
                 }}
               >
                 <div
                   style={{
-                    fontSize: 18,
+                    fontSize: 17,
                     fontWeight: 700,
                     letterSpacing: 3,
-                    marginBottom: 14,
-                    display: "flex",
-                  }}
-                >
-                  WHY WE LIKE IT
-                </div>
-
-                <div
-                  style={{
-                    fontSize: 32,
-                    lineHeight: 1.25,
-                    display: "flex",
-                  }}
-                >
-                  {restaurant.why_we_like_it}
-                </div>
-              </div>
-
-              <div
-                style={{
-                  width: "2px",
-                  minHeight: "280px",
-                  background: "#d8d2c4",
-                  display: "flex",
-                }}
-              />
-
-              <div
-                style={{
-                  width: "34%",
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 700,
-                    letterSpacing: 3,
-                    marginBottom: 14,
+                    marginBottom: 12,
                     display: "flex",
                   }}
                 >
@@ -238,28 +273,50 @@ export async function POST(request) {
 
                 <div
                   style={{
-                    fontSize: 25,
-                    lineHeight: 1.3,
+                    fontSize: 26,
+                    lineHeight: 1.28,
                     display: "flex",
                   }}
                 >
-                  {restaurant.good_to_know}
+                  {goodToKnow}
                 </div>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minWidth: "180px",
+                  padding: "15px 20px",
+                  border: "2px solid #073b2d",
+                  borderRadius: 40,
+                  fontSize: 17,
+                  fontWeight: 700,
+                  letterSpacing: 1,
+                }}
+              >
+                SAVE THIS
               </div>
             </div>
 
             <div
               style={{
                 marginTop: "auto",
-                borderTop: "2px solid #d8d2c4",
                 paddingTop: 22,
+                borderTop: "2px solid #d7d0c1",
+                width: "100%",
                 display: "flex",
                 justifyContent: "space-between",
-                fontSize: 18,
-                width: "100%",
+                fontSize: 17,
               }}
             >
-              <div style={{ display: "flex" }}>
+              <div
+                style={{
+                  display: "flex",
+                  opacity: 0.75,
+                }}
+              >
                 Independent Budapest food guide
               </div>
 
