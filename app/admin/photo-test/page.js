@@ -24,7 +24,7 @@ export default function PhotoTestPage() {
           photoIndex: 1,
 
           sourceUrl:
-              "https://www.feedme-budapest.com/api/place-photo?placeId=ChIJgSWQgAvdQUcRGzU1QwbpYmU&photoIndex=1",
+              "https://www.feedme-budapest.com/api/place-photo?placeId=ChIJgSWQgAvdQUcRGzU1QwbpYmU&index=1",
         }),
       });
 
