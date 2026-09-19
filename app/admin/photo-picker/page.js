@@ -13,6 +13,8 @@ export default function PhotoPickerPage() {
   const [loading, setLoading] = useState(true);
   const [savingIndex, setSavingIndex] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [slideUrl, setSlideUrl] = useState("");
+  const [slideLoading, setSlideLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -66,11 +68,55 @@ export default function PhotoPickerPage() {
     }
   }
 
+  async function buildSlide(publicUrl) {
+    setSlideLoading(true);
+    setSlideUrl("");
+    setError("");
+
+    try {
+      const response = await fetch(
+        "/api/build-restaurant-slide",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            restaurantId: RESTAURANT.id,
+            photoUrl: publicUrl,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+
+        throw new Error(
+          data?.error || "Could not generate slide."
+        );
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+
+      setSlideUrl(url);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not generate slide."
+      );
+    } finally {
+      setSlideLoading(false);
+    }
+  }
+
   async function usePhoto(photo) {
     if (!photo?.url) return;
 
     setSavingIndex(photo.index);
     setError("");
+    setSlideUrl("");
 
     try {
       const response = await fetch(
@@ -80,7 +126,6 @@ export default function PhotoPickerPage() {
           headers: {
             "Content-Type": "application/json",
           },
-
           body: JSON.stringify({
             restaurantId: RESTAURANT.id,
             restaurantName: RESTAURANT.name,
@@ -98,11 +143,15 @@ export default function PhotoPickerPage() {
         );
       }
 
-      setSelected({
+      const selectedPhoto = {
         ...photo,
         publicUrl: data.publicUrl,
         storagePath: data.storagePath,
-      });
+      };
+
+      setSelected(selectedPhoto);
+
+      await buildSlide(data.publicUrl);
     } catch (err) {
       setError(
         err instanceof Error
@@ -141,14 +190,38 @@ export default function PhotoPickerPage() {
           <strong>✓ Photo selected and cached</strong>
 
           <div style={styles.successText}>
-            Photo #{selected.index + 1} is now stored in
-            Feed Me Budapest&apos;s own media storage.
+            Photo #{selected.index + 1} is stored in
+            Feed Me Budapest media storage.
           </div>
 
           <img
             src={selected.publicUrl}
-            alt="Selected restaurant photo"
+            alt="Selected restaurant"
             style={styles.selectedImage}
+          />
+        </div>
+      )}
+
+      {slideLoading && (
+        <div style={styles.loadingBox}>
+          Building Feed Me Budapest slide…
+        </div>
+      )}
+
+      {slideUrl && (
+        <div style={styles.slideSection}>
+          <div style={styles.eyebrow}>
+            GENERATED SLIDE
+          </div>
+
+          <h2 style={styles.slideTitle}>
+            Feed Me Budapest preview
+          </h2>
+
+          <img
+            src={slideUrl}
+            alt="Generated Feed Me Budapest restaurant slide"
+            style={styles.slideImage}
           />
         </div>
       )}
@@ -272,6 +345,39 @@ const styles = {
   selectedImage: {
     width: "100%",
     maxWidth: 380,
+    borderRadius: 14,
+    display: "block",
+  },
+
+  loadingBox: {
+    maxWidth: 1100,
+    margin: "0 auto 24px",
+    padding: 16,
+    borderRadius: 14,
+    background: "#fffdf7",
+    border: "1px solid #ddd7ca",
+  },
+
+  slideSection: {
+    maxWidth: 1100,
+    margin: "0 auto 32px",
+    padding: 20,
+    background: "#fffdf7",
+    border: "1px solid #ddd7ca",
+    borderRadius: 18,
+  },
+
+  slideTitle: {
+    fontFamily: "Georgia, serif",
+    fontSize: 30,
+    margin: "8px 0 18px",
+  },
+
+  slideImage: {
+    width: "100%",
+    maxWidth: 540,
+    aspectRatio: "4 / 5",
+    objectFit: "cover",
     borderRadius: 14,
     display: "block",
   },
