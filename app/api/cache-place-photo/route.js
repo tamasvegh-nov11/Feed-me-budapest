@@ -1,207 +1,189 @@
 export const dynamic = "force-dynamic";
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL?.trim();
-
+const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
 const SUPABASE_SECRET_KEY =
   process.env.SUPABASE_SECRET_KEY?.trim();
 
-const BUCKET = "feed-media";
-
-function json(data, status = 200) {
-  return Response.json(data, { status });
+function supabaseHeaders(extra = {}) {
+  return {
+    apikey: SUPABASE_SECRET_KEY,
+    "Content-Type": "application/json",
+    ...extra,
+  };
 }
 
-function safeFileName(value = "") {
+function safeName(value = "") {
   return String(value)
     .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9._-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
+    .replace(/[^a-z0-9-_]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+async function getImageFromSource(sourceUrl) {
+  const response = await fetch(sourceUrl, {
+    redirect: "follow",
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Source returned HTTP ${response.status}`
+    );
+  }
+
+  const contentType =
+    response.headers.get("content-type") || "";
+
+  if (!contentType.startsWith("image/")) {
+    throw new Error(
+      `Source did not return an image. Content-Type: ${contentType || "unknown"}`
+    );
+  }
+
+  const arrayBuffer =
+    await response.arrayBuffer();
+
+  return {
+    bytes: new Uint8Array(arrayBuffer),
+    contentType,
+  };
+}
+
+async function uploadToSupabase({
+  bytes,
+  contentType,
+  path,
+}) {
+  const uploadUrl =
+    `${SUPABASE_URL}/storage/v1/object/feed-media/${path}`;
+
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_SECRET_KEY,
+      Authorization:
+        `Bearer ${SUPABASE_SECRET_KEY}`,
+      "Content-Type": contentType,
+      "x-upsert": "true",
+    },
+    body: bytes,
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      data?.message ||
+      data?.error ||
+      `Supabase upload failed with HTTP ${response.status}`
+    );
+  }
+
+  return (
+    `${SUPABASE_URL}/storage/v1/object/public/feed-media/${path}`
+  );
 }
 
 export async function POST(request) {
   try {
-    if (
-      !SUPABASE_URL ||
-      !SUPABASE_SECRET_KEY
-    ) {
-      return json(
+    if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
+      return Response.json(
         {
           ok: false,
           error:
-            "Supabase configuration is missing.",
+            "Supabase environment variables are missing.",
         },
-        500
+        { status: 500 }
       );
     }
 
-    const body =
-      await request.json();
+    const body = await request.json();
 
     const sourceUrl =
-      body?.sourceUrl;
+      body?.sourceUrl?.trim();
 
-    const requestedName =
-      body?.fileName;
+    const restaurantId =
+      body?.restaurantId?.trim();
 
-    if (
-      !sourceUrl ||
-      typeof sourceUrl !== "string"
-    ) {
-      return json(
+    const restaurantName =
+      body?.restaurantName?.trim();
+
+    const photoIndex =
+      Number.isInteger(body?.photoIndex)
+        ? body.photoIndex
+        : 0;
+
+    if (!sourceUrl) {
+      return Response.json(
         {
           ok: false,
-          error:
-            "sourceUrl is required.",
+          error: "sourceUrl is required.",
         },
-        400
+        { status: 400 }
       );
     }
 
-    if (
-      !sourceUrl.startsWith("https://")
-    ) {
-      return json(
+    if (!restaurantId && !restaurantName) {
+      return Response.json(
         {
           ok: false,
           error:
-            "sourceUrl must use HTTPS.",
+            "restaurantId or restaurantName is required.",
         },
-        400
+        { status: 400 }
       );
     }
 
-    /*
-      1. DOWNLOAD IMAGE
-    */
-
-    const sourceResponse =
-      await fetch(sourceUrl, {
-        cache: "no-store",
-        redirect: "follow",
-      });
-
-    if (!sourceResponse.ok) {
-      return json(
-        {
-          ok: false,
-          error:
-            `Source returned HTTP ${sourceResponse.status}.`,
-        },
-        400
-      );
-    }
-
-    const contentType =
-      sourceResponse.headers.get(
-        "content-type"
-      ) || "";
-
-    if (
-      !contentType.startsWith("image/")
-    ) {
-      return json(
-        {
-          ok: false,
-          error:
-            `Source did not return an image. Content-Type: ${contentType || "unknown"}`,
-        },
-        400
-      );
-    }
-
-    const bytes =
-      await sourceResponse.arrayBuffer();
-
-    /*
-      2. DETERMINE FILE EXTENSION
-    */
+    const image =
+      await getImageFromSource(sourceUrl);
 
     let extension = "jpg";
 
     if (
-      contentType.includes("png")
+      image.contentType.includes("png")
     ) {
       extension = "png";
     } else if (
-      contentType.includes("webp")
+      image.contentType.includes("webp")
     ) {
       extension = "webp";
     } else if (
-      contentType.includes("gif")
+      image.contentType.includes("jpeg")
     ) {
-      extension = "gif";
+      extension = "jpg";
     }
 
-    /*
-      3. CREATE SAFE STORAGE PATH
-    */
+    const base =
+      safeName(
+        restaurantId ||
+        restaurantName
+      ) || "restaurant";
 
-    const baseName =
-      safeFileName(
-        requestedName ||
-          `feed-${Date.now()}`
-      ) || `feed-${Date.now()}`;
-
-    const objectPath =
-      `restaurant-photos/${baseName}.${extension}`;
-
-    /*
-      4. UPLOAD TO SUPABASE STORAGE
-    */
-
-    const uploadResponse =
-      await fetch(
-        `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${objectPath}`,
-        {
-          method: "POST",
-          headers: {
-            apikey:
-              SUPABASE_SECRET_KEY,
-            Authorization:
-              `Bearer ${SUPABASE_SECRET_KEY}`,
-            "Content-Type":
-              contentType,
-            "x-upsert": "true",
-          },
-          body: bytes,
-        }
-      );
-
-    const uploadText =
-      await uploadResponse.text();
-
-    if (!uploadResponse.ok) {
-      return json(
-        {
-          ok: false,
-          error:
-            `Supabase upload failed: ${uploadText}`,
-        },
-        uploadResponse.status
-      );
-    }
-
-    /*
-      5. PUBLIC URL
-    */
+    const path =
+      `restaurants/${base}/photo-${photoIndex}.${extension}`;
 
     const publicUrl =
-      `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${objectPath}`;
+      await uploadToSupabase({
+        bytes: image.bytes,
+        contentType: image.contentType,
+        path,
+      });
 
-    return json({
+    return Response.json({
       ok: true,
-      bucket: BUCKET,
-      path: objectPath,
+      restaurantId:
+        restaurantId || null,
+      restaurantName:
+        restaurantName || null,
+      photoIndex,
+      storagePath: path,
       publicUrl,
-      contentType,
-      bytes:
-        bytes.byteLength,
+      contentType:
+        image.contentType,
     });
   } catch (error) {
-    return json(
+    return Response.json(
       {
         ok: false,
         error:
@@ -209,7 +191,7 @@ export async function POST(request) {
             ? error.message
             : "Unknown error",
       },
-      500
+      { status: 500 }
     );
   }
 }
