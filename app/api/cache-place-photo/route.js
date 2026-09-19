@@ -6,55 +6,19 @@ const SUPABASE_URL =
 const SUPABASE_SECRET_KEY =
   process.env.SUPABASE_SECRET_KEY?.trim();
 
-const ADMIN_CONTENT_KEY =
-  process.env.ADMIN_CONTENT_KEY?.trim();
-
 const BUCKET = "feed-media";
 
-function isAuthorized(adminKey) {
-  return Boolean(
-    ADMIN_CONTENT_KEY &&
-      adminKey &&
-      adminKey === ADMIN_CONTENT_KEY
-  );
+function json(data, status = 200) {
+  return Response.json(data, { status });
 }
 
-function safeFilePart(value = "") {
+function safeFileName(value = "") {
   return String(value)
-    .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9-_]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-async function uploadToSupabase({
-  path,
-  bytes,
-  contentType,
-}) {
-  const response = await fetch(
-    `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`,
-    {
-      method: "POST",
-      headers: {
-        apikey: SUPABASE_SECRET_KEY,
-        Authorization: `Bearer ${SUPABASE_SECRET_KEY}`,
-        "Content-Type": contentType,
-        "x-upsert": "true",
-      },
-      body: bytes,
-    }
-  );
-
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    throw new Error(
-      data?.message ||
-        data?.error ||
-        `Supabase upload failed (${response.status})`
-    );
-  }
+    .trim()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 export async function POST(request) {
@@ -63,119 +27,181 @@ export async function POST(request) {
       !SUPABASE_URL ||
       !SUPABASE_SECRET_KEY
     ) {
-      return Response.json(
+      return json(
         {
           ok: false,
           error:
             "Supabase configuration is missing.",
         },
-        { status: 500 }
+        500
       );
     }
 
-    const body = await request.json();
-
-    const adminKey =
-      body?.adminKey || "";
+    const body =
+      await request.json();
 
     const sourceUrl =
-      body?.sourceUrl || "";
+      body?.sourceUrl;
 
-    const restaurantId =
-      body?.restaurantId || "restaurant";
+    const requestedName =
+      body?.fileName;
 
-    const photoIndex =
-      Number.isFinite(
-        Number(body?.photoIndex)
-      )
-        ? Number(body.photoIndex)
-        : 0;
-
-    if (!isAuthorized(adminKey)) {
-      return Response.json(
+    if (
+      !sourceUrl ||
+      typeof sourceUrl !== "string"
+    ) {
+      return json(
         {
           ok: false,
           error:
-            "Incorrect admin password.",
+            "sourceUrl is required.",
         },
-        { status: 401 }
+        400
       );
     }
 
     if (
-      typeof sourceUrl !== "string" ||
       !sourceUrl.startsWith("https://")
     ) {
-      return Response.json(
+      return json(
         {
           ok: false,
           error:
-            "A valid HTTPS sourceUrl is required.",
+            "sourceUrl must use HTTPS.",
         },
-        { status: 400 }
+        400
       );
     }
+
+    /*
+      1. DOWNLOAD IMAGE
+    */
 
     const sourceResponse =
       await fetch(sourceUrl, {
         cache: "no-store",
+        redirect: "follow",
       });
 
     if (!sourceResponse.ok) {
-      throw new Error(
-        `Could not download source image (${sourceResponse.status})`
+      return json(
+        {
+          ok: false,
+          error:
+            `Source returned HTTP ${sourceResponse.status}.`,
+        },
+        400
       );
     }
 
     const contentType =
       sourceResponse.headers.get(
         "content-type"
-      ) || "image/jpeg";
+      ) || "";
 
     if (
       !contentType.startsWith("image/")
     ) {
-      throw new Error(
-        `Source URL did not return an image (${contentType})`
+      return json(
+        {
+          ok: false,
+          error:
+            `Source did not return an image. Content-Type: ${contentType || "unknown"}`,
+        },
+        400
       );
     }
 
     const bytes =
       await sourceResponse.arrayBuffer();
 
-    const extension =
+    /*
+      2. DETERMINE FILE EXTENSION
+    */
+
+    let extension = "jpg";
+
+    if (
       contentType.includes("png")
-        ? "png"
-        : contentType.includes("webp")
-        ? "webp"
-        : "jpg";
+    ) {
+      extension = "png";
+    } else if (
+      contentType.includes("webp")
+    ) {
+      extension = "webp";
+    } else if (
+      contentType.includes("gif")
+    ) {
+      extension = "gif";
+    }
 
-    const id =
-      safeFilePart(restaurantId) ||
-      "restaurant";
+    /*
+      3. CREATE SAFE STORAGE PATH
+    */
 
-    const path =
-      `restaurants/${id}/photo-${photoIndex}.${extension}`;
+    const baseName =
+      safeFileName(
+        requestedName ||
+          `feed-${Date.now()}`
+      ) || `feed-${Date.now()}`;
 
-    await uploadToSupabase({
-      path,
-      bytes,
-      contentType,
-    });
+    const objectPath =
+      `restaurant-photos/${baseName}.${extension}`;
+
+    /*
+      4. UPLOAD TO SUPABASE STORAGE
+    */
+
+    const uploadResponse =
+      await fetch(
+        `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${objectPath}`,
+        {
+          method: "POST",
+          headers: {
+            apikey:
+              SUPABASE_SECRET_KEY,
+            Authorization:
+              `Bearer ${SUPABASE_SECRET_KEY}`,
+            "Content-Type":
+              contentType,
+            "x-upsert": "true",
+          },
+          body: bytes,
+        }
+      );
+
+    const uploadText =
+      await uploadResponse.text();
+
+    if (!uploadResponse.ok) {
+      return json(
+        {
+          ok: false,
+          error:
+            `Supabase upload failed: ${uploadText}`,
+        },
+        uploadResponse.status
+      );
+    }
+
+    /*
+      5. PUBLIC URL
+    */
 
     const publicUrl =
-      `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
+      `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${objectPath}`;
 
-    return Response.json({
+    return json({
       ok: true,
       bucket: BUCKET,
-      path,
+      path: objectPath,
       publicUrl,
       contentType,
-      bytes: bytes.byteLength,
+      bytes:
+        bytes.byteLength,
     });
   } catch (error) {
-    return Response.json(
+    return json(
       {
         ok: false,
         error:
@@ -183,7 +209,7 @@ export async function POST(request) {
             ? error.message
             : "Unknown error",
       },
-      { status: 500 }
+      500
     );
   }
 }
