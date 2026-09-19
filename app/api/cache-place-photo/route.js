@@ -4,14 +4,6 @@ const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
 const SUPABASE_SECRET_KEY =
   process.env.SUPABASE_SECRET_KEY?.trim();
 
-function supabaseHeaders(extra = {}) {
-  return {
-    apikey: SUPABASE_SECRET_KEY,
-    "Content-Type": "application/json",
-    ...extra,
-  };
-}
-
 function safeName(value = "") {
   return String(value)
     .toLowerCase()
@@ -37,7 +29,9 @@ async function getImageFromSource(sourceUrl) {
 
   if (!contentType.startsWith("image/")) {
     throw new Error(
-      `Source did not return an image. Content-Type: ${contentType || "unknown"}`
+      `Source did not return an image. Content-Type: ${
+        contentType || "unknown"
+      }`
     );
   }
 
@@ -62,32 +56,32 @@ async function uploadToSupabase({
     method: "POST",
     headers: {
       apikey: SUPABASE_SECRET_KEY,
-      Authorization:
-        `Bearer ${SUPABASE_SECRET_KEY}`,
       "Content-Type": contentType,
       "x-upsert": "true",
     },
     body: bytes,
   });
 
-  const data = await response.json().catch(() => null);
+  const data =
+    await response.json().catch(() => null);
 
   if (!response.ok) {
     throw new Error(
       data?.message ||
-      data?.error ||
-      `Supabase upload failed with HTTP ${response.status}`
+        data?.error ||
+        `Supabase upload failed with HTTP ${response.status}`
     );
   }
 
-  return (
-    `${SUPABASE_URL}/storage/v1/object/public/feed-media/${path}`
-  );
+  return `${SUPABASE_URL}/storage/v1/object/public/feed-media/${path}`;
 }
 
 export async function POST(request) {
   try {
-    if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
+    if (
+      !SUPABASE_URL ||
+      !SUPABASE_SECRET_KEY
+    ) {
       return Response.json(
         {
           ok: false,
@@ -100,7 +94,7 @@ export async function POST(request) {
 
     const body = await request.json();
 
-    const sourceUrl =
+    const sourceUrlRaw =
       body?.sourceUrl?.trim();
 
     const restaurantId =
@@ -114,7 +108,7 @@ export async function POST(request) {
         ? body.photoIndex
         : 0;
 
-    if (!sourceUrl) {
+    if (!sourceUrlRaw) {
       return Response.json(
         {
           ok: false,
@@ -124,7 +118,10 @@ export async function POST(request) {
       );
     }
 
-    if (!restaurantId && !restaurantName) {
+    if (
+      !restaurantId &&
+      !restaurantName
+    ) {
       return Response.json(
         {
           ok: false,
@@ -135,8 +132,21 @@ export async function POST(request) {
       );
     }
 
+    /*
+      This is the important fix:
+      relative URLs like /api/place-photo?... are
+      converted into a full URL automatically.
+    */
+    const sourceUrl =
+      new URL(
+        sourceUrlRaw,
+        request.url
+      ).toString();
+
     const image =
-      await getImageFromSource(sourceUrl);
+      await getImageFromSource(
+        sourceUrl
+      );
 
     let extension = "jpg";
 
@@ -148,16 +158,12 @@ export async function POST(request) {
       image.contentType.includes("webp")
     ) {
       extension = "webp";
-    } else if (
-      image.contentType.includes("jpeg")
-    ) {
-      extension = "jpg";
     }
 
     const base =
       safeName(
         restaurantId ||
-        restaurantName
+          restaurantName
       ) || "restaurant";
 
     const path =
@@ -166,7 +172,8 @@ export async function POST(request) {
     const publicUrl =
       await uploadToSupabase({
         bytes: image.bytes,
-        contentType: image.contentType,
+        contentType:
+          image.contentType,
         path,
       });
 
@@ -177,6 +184,7 @@ export async function POST(request) {
       restaurantName:
         restaurantName || null,
       photoIndex,
+      sourceUrl,
       storagePath: path,
       publicUrl,
       contentType:
