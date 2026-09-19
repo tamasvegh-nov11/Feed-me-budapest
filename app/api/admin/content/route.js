@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 const VERSION = "FMB-ADMIN-V4";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
+const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY?.trim();
 const ADMIN_CONTENT_KEY = process.env.ADMIN_CONTENT_KEY;
 
 const allowedStatuses = [
