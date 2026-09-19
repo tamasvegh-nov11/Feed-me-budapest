@@ -1,4 +1,4 @@
-"use client";
+ "use client";
 
 import { useEffect, useState } from "react";
 
@@ -74,6 +74,14 @@ export default function ContentAdminPage() {
         "feedme_admin_key",
         key
       );
+
+      if (selected) {
+        const updated = (data.items || []).find(
+          (item) => item.id === selected.id
+        );
+
+        setSelected(updated || null);
+      }
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -148,7 +156,6 @@ export default function ContentAdminPage() {
     return (
       <main style={styles.loginPage}>
         <form onSubmit={login} style={styles.loginBox}>
-
           <div style={styles.eyebrow}>
             FEED ME BUDAPEST
           </div>
@@ -189,7 +196,6 @@ export default function ContentAdminPage() {
           <div style={styles.version}>
             {VERSION}
           </div>
-
         </form>
       </main>
     );
@@ -209,9 +215,7 @@ export default function ContentAdminPage() {
 
   return (
     <main style={styles.page}>
-
       <div style={styles.header}>
-
         <div>
           <div style={styles.eyebrow}>
             FEED ME BUDAPEST
@@ -227,7 +231,6 @@ export default function ContentAdminPage() {
         </div>
 
         <div style={styles.headerButtons}>
-
           <button
             onClick={() => loadContent(adminKey)}
             style={styles.secondaryButton}
@@ -241,13 +244,10 @@ export default function ContentAdminPage() {
           >
             Log out
           </button>
-
         </div>
-
       </div>
 
       <div style={styles.tabs}>
-
         {tabs.map((status) => (
           <button
             key={status}
@@ -271,10 +271,8 @@ export default function ContentAdminPage() {
                 ).length
               }
             </span>
-
           </button>
         ))}
-
       </div>
 
       {message && (
@@ -293,11 +291,8 @@ export default function ContentAdminPage() {
         </div>
       ) : (
         <div style={styles.grid}>
-
           <div style={styles.list}>
-
             {filtered.map((item) => (
-
               <button
                 key={item.id}
                 onClick={() =>
@@ -310,9 +305,7 @@ export default function ContentAdminPage() {
                     : {}),
                 }}
               >
-
                 <div style={styles.cardTop}>
-
                   <span style={styles.type}>
                     {item.content_type?.toUpperCase()}
                   </span>
@@ -322,7 +315,6 @@ export default function ContentAdminPage() {
                       SALVE
                     </span>
                   )}
-
                 </div>
 
                 <h2 style={styles.cardTitle}>
@@ -334,27 +326,18 @@ export default function ContentAdminPage() {
                     {item.topic}
                   </div>
                 )}
-
               </button>
-
             ))}
-
           </div>
 
           <div style={styles.preview}>
-
             {!selected ? (
-
               <div style={styles.previewEmpty}>
                 Select a content item to preview it.
               </div>
-
             ) : (
-
               <>
-
                 <div style={styles.previewHeader}>
-
                   <span style={styles.type}>
                     {selected.content_type?.toUpperCase()}
                   </span>
@@ -362,7 +345,6 @@ export default function ContentAdminPage() {
                   <span style={styles.status}>
                     {STATUS_LABELS[selected.status] || selected.status}
                   </span>
-
                 </div>
 
                 <h2 style={styles.previewTitle}>
@@ -371,30 +353,22 @@ export default function ContentAdminPage() {
 
                 {Array.isArray(selected.media_urls) &&
                   selected.media_urls.length > 0 && (
-
                     <div style={styles.images}>
-
                       {selected.media_urls.map(
                         (url, index) => (
-
                           <img
                             key={index}
                             src={url}
                             alt={`Slide ${index + 1}`}
                             style={styles.image}
                           />
-
                         )
                       )}
-
                     </div>
-
                   )}
 
                 {selected.caption && (
-
                   <section style={styles.section}>
-
                     <h3 style={styles.sectionTitle}>
                       Caption
                     </h3>
@@ -402,16 +376,54 @@ export default function ContentAdminPage() {
                     <p style={styles.caption}>
                       {selected.caption}
                     </p>
-
                   </section>
+                )}
 
+                {Array.isArray(selected.slide_text) &&
+                  selected.slide_text.length > 0 && (
+                    <section style={styles.section}>
+                      <h3 style={styles.sectionTitle}>
+                        Slides
+                      </h3>
+
+                      {selected.slide_text.map(
+                        (slide, index) => (
+                          <div
+                            key={index}
+                            style={styles.slideText}
+                          >
+                            <strong>
+                              Slide {index + 1}
+                            </strong>
+
+                            <div>
+                              {typeof slide === "string"
+                                ? slide
+                                : JSON.stringify(slide)}
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </section>
+                  )}
+
+                {selected.publish_at && (
+                  <section style={styles.section}>
+                    <h3 style={styles.sectionTitle}>
+                      Scheduled for
+                    </h3>
+
+                    <div>
+                      {new Date(
+                        selected.publish_at
+                      ).toLocaleString()}
+                    </div>
+                  </section>
                 )}
 
                 {selected.status ===
                   "ready_for_review" && (
-
                   <div style={styles.actions}>
-
                     <button
                       onClick={() =>
                         changeStatus(
@@ -435,32 +447,23 @@ export default function ContentAdminPage() {
                     >
                       Reject
                     </button>
-
                   </div>
-
                 )}
 
                 {selected.error_message && (
-
                   <div style={styles.error}>
                     {selected.error_message}
                   </div>
-
                 )}
-
               </>
-
             )}
-
           </div>
-
         </div>
       )}
 
       <div style={styles.footerVersion}>
         {VERSION}
       </div>
-
     </main>
   );
 }
@@ -469,7 +472,6 @@ const green = "#073b2d";
 const cream = "#f7f3e8";
 
 const styles = {
-
   loginPage: {
     minHeight: "100vh",
     background: cream,
@@ -547,16 +549,18 @@ const styles = {
     minHeight: "100vh",
     background: cream,
     color: green,
-    padding: "40px 20px 80px",
+    padding: "28px 16px 80px",
     fontFamily: "Arial, sans-serif",
+    boxSizing: "border-box",
   },
 
   header: {
     maxWidth: 1200,
-    margin: "0 auto 30px",
+    margin: "0 auto 24px",
     display: "flex",
+    flexWrap: "wrap",
     justifyContent: "space-between",
-    gap: 20,
+    gap: 16,
     alignItems: "center",
   },
 
@@ -564,11 +568,13 @@ const styles = {
     fontFamily: "Georgia, serif",
     fontSize: "clamp(34px,6vw,64px)",
     margin: "8px 0",
+    lineHeight: 0.95,
   },
 
   headerButtons: {
     display: "flex",
     gap: 8,
+    flexWrap: "wrap",
   },
 
   primaryButton: {
@@ -593,6 +599,7 @@ const styles = {
     display: "flex",
     gap: 8,
     overflowX: "auto",
+    paddingBottom: 4,
   },
 
   tab: {
@@ -602,6 +609,7 @@ const styles = {
     background: "#e9e4d7",
     color: green,
     whiteSpace: "nowrap",
+    flexShrink: 0,
   },
 
   activeTab: {
@@ -627,14 +635,16 @@ const styles = {
     margin: "0 auto",
     display: "grid",
     gridTemplateColumns:
-      "minmax(260px,380px) minmax(0,1fr)",
+      "repeat(auto-fit, minmax(320px, 1fr))",
     gap: 20,
+    alignItems: "start",
   },
 
   list: {
     display: "flex",
     flexDirection: "column",
     gap: 12,
+    minWidth: 0,
   },
 
   card: {
@@ -645,6 +655,7 @@ const styles = {
     border: "1px solid #ddd7ca",
     borderRadius: 16,
     padding: 18,
+    boxSizing: "border-box",
   },
 
   selectedCard: {
@@ -675,6 +686,7 @@ const styles = {
     fontFamily: "Georgia, serif",
     margin: "0 0 8px",
     fontSize: 22,
+    lineHeight: 1.1,
   },
 
   topic: {
@@ -687,18 +699,23 @@ const styles = {
     borderRadius: 20,
     padding: "clamp(20px,4vw,35px)",
     border: "1px solid #ddd7ca",
-    minHeight: 420,
+    minHeight: 320,
+    minWidth: 0,
+    overflow: "hidden",
+    boxSizing: "border-box",
   },
 
   previewEmpty: {
     opacity: 0.5,
     textAlign: "center",
-    paddingTop: 100,
+    padding: "70px 20px",
   },
 
   previewHeader: {
     display: "flex",
     justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
   },
 
   status: {
@@ -712,6 +729,8 @@ const styles = {
     fontFamily: "Georgia, serif",
     fontSize: "clamp(28px,5vw,46px)",
     margin: "18px 0 25px",
+    lineHeight: 1.05,
+    overflowWrap: "anywhere",
   },
 
   images: {
@@ -719,10 +738,11 @@ const styles = {
     gap: 10,
     overflowX: "auto",
     marginBottom: 28,
+    paddingBottom: 4,
   },
 
   image: {
-    width: 180,
+    width: "min(180px, 70vw)",
     aspectRatio: "4 / 5",
     objectFit: "cover",
     borderRadius: 12,
@@ -733,6 +753,7 @@ const styles = {
     borderTop: "1px solid #ddd7ca",
     paddingTop: 20,
     marginTop: 20,
+    minWidth: 0,
   },
 
   sectionTitle: {
@@ -744,16 +765,25 @@ const styles = {
   caption: {
     whiteSpace: "pre-wrap",
     lineHeight: 1.6,
+    overflowWrap: "anywhere",
+    wordBreak: "break-word",
+  },
+
+  slideText: {
+    padding: "10px 0",
+    lineHeight: 1.5,
+    overflowWrap: "anywhere",
   },
 
   actions: {
     display: "flex",
     gap: 12,
     marginTop: 30,
+    flexWrap: "wrap",
   },
 
   approve: {
-    flex: 1,
+    flex: "1 1 180px",
     border: "none",
     background: green,
     color: cream,
@@ -763,6 +793,7 @@ const styles = {
   },
 
   reject: {
+    flex: "1 1 120px",
     border: `1px solid ${green}`,
     background: "transparent",
     color: green,
