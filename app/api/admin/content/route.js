@@ -1,12 +1,16 @@
 export const dynamic = "force-dynamic";
 
-const VERSION = "FMB-ADMIN-V5";
+const VERSION = "FMB-ADMIN-V6";
 
-const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
+const SUPABASE_URL =
+  process.env.SUPABASE_URL?.trim();
+
 const SUPABASE_SECRET_KEY =
   process.env.SUPABASE_SECRET_KEY?.trim();
+
 const ADMIN_CONTENT_KEY =
   process.env.ADMIN_CONTENT_KEY?.trim();
+
 const BUFFER_API_KEY =
   process.env.BUFFER_API_KEY?.trim();
 
@@ -38,18 +42,27 @@ function supabaseHeaders(extra = {}) {
 
 async function bufferQuery(query) {
   if (!BUFFER_API_KEY) {
-    throw new Error("BUFFER_API_KEY is missing.");
+    throw new Error(
+      "BUFFER_API_KEY is missing."
+    );
   }
 
-  const response = await fetch("https://api.buffer.com", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${BUFFER_API_KEY}`,
-    },
-    body: JSON.stringify({ query }),
-    cache: "no-store",
-  });
+  const response = await fetch(
+    "https://api.buffer.com",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type":
+          "application/json",
+        Authorization:
+          `Bearer ${BUFFER_API_KEY}`,
+      },
+      body: JSON.stringify({
+        query,
+      }),
+      cache: "no-store",
+    }
+  );
 
   const data = await response.json();
 
@@ -62,7 +75,11 @@ async function bufferQuery(query) {
   if (data.errors?.length) {
     throw new Error(
       data.errors
-        .map((item) => item.message || "Buffer error")
+        .map(
+          (item) =>
+            item.message ||
+            "Buffer error"
+        )
         .join("; ")
     );
   }
@@ -71,43 +88,49 @@ async function bufferQuery(query) {
 }
 
 async function getInstagramChannelId() {
-  const orgResult = await bufferQuery(`
-    query GetOrganizations {
-      account {
-        organizations {
-          id
-          name
-        }
-      }
-    }
-  `);
-
-  const organizations =
-    orgResult.data?.account?.organizations || [];
-
-  for (const org of organizations) {
-    const channelResult = await bufferQuery(`
-      query GetChannels {
-        channels(
-          input: {
-            organizationId: "${org.id}"
+  const orgResult =
+    await bufferQuery(`
+      query GetOrganizations {
+        account {
+          organizations {
+            id
+            name
           }
-        ) {
-          id
-          name
-          displayName
-          service
         }
       }
     `);
 
-    const channels =
-      channelResult.data?.channels || [];
+  const organizations =
+    orgResult.data?.account
+      ?.organizations || [];
 
-    const instagram = channels.find(
-      (channel) =>
-        channel.service === "instagram"
-    );
+  for (const org of organizations) {
+    const channelResult =
+      await bufferQuery(`
+        query GetChannels {
+          channels(
+            input: {
+              organizationId: "${org.id}"
+            }
+          ) {
+            id
+            name
+            displayName
+            service
+          }
+        }
+      `);
+
+    const channels =
+      channelResult.data?.channels ||
+      [];
+
+    const instagram =
+      channels.find(
+        (channel) =>
+          channel.service ===
+          "instagram"
+      );
 
     if (instagram?.id) {
       return instagram.id;
@@ -128,7 +151,9 @@ function escapeGraphQL(value = "") {
 }
 
 function normalizeMediaUrls(value) {
-  if (!Array.isArray(value)) return [];
+  if (!Array.isArray(value)) {
+    return [];
+  }
 
   return value.filter(
     (url) =>
@@ -137,7 +162,9 @@ function normalizeMediaUrls(value) {
   );
 }
 
-function instagramMetadata(contentType) {
+function instagramMetadata(
+  contentType
+) {
   if (contentType === "story") {
     return `
       metadata: {
@@ -186,7 +213,9 @@ async function createBufferPost(item) {
     await getInstagramChannelId();
 
   const mediaUrls =
-    normalizeMediaUrls(item.media_urls);
+    normalizeMediaUrls(
+      item.media_urls
+    );
 
   if (mediaUrls.length === 0) {
     throw new Error(
@@ -194,16 +223,22 @@ async function createBufferPost(item) {
     );
   }
 
-  const caption = escapeGraphQL(
-    item.caption || item.title || ""
-  );
+  const caption =
+    escapeGraphQL(
+      item.caption ||
+        item.title ||
+        ""
+    );
 
   const assets = mediaUrls
     .map((url) => {
       const safeUrl =
         escapeGraphQL(url);
 
-      if (item.content_type === "reel") {
+      if (
+        item.content_type ===
+        "reel"
+      ) {
         return `
           {
             video: {
@@ -223,9 +258,12 @@ async function createBufferPost(item) {
     })
     .join(",");
 
-  const publishAt = item.publish_at
-    ? escapeGraphQL(item.publish_at)
-    : null;
+  const publishAt =
+    item.publish_at
+      ? escapeGraphQL(
+          item.publish_at
+        )
+      : null;
 
   const mode = publishAt
     ? "customScheduled"
@@ -244,9 +282,11 @@ async function createBufferPost(item) {
           schedulingType: automatic
           mode: ${mode}
           ${dueAtLine}
+
           ${instagramMetadata(
             item.content_type
           )}
+
           assets: [
             ${assets}
           ]
@@ -294,18 +334,71 @@ async function createBufferPost(item) {
   return response.post;
 }
 
+async function deleteBufferPost(
+  bufferPostId
+) {
+  const safeId =
+    escapeGraphQL(bufferPostId);
+
+  const mutation = `
+    mutation DeletePost {
+      deletePost(
+        input: {
+          id: "${safeId}"
+        }
+      ) {
+        ... on DeletePostSuccess {
+          id
+        }
+
+        ... on MutationError {
+          message
+        }
+      }
+    }
+  `;
+
+  const result =
+    await bufferQuery(mutation);
+
+  const response =
+    result.data?.deletePost;
+
+  if (!response) {
+    throw new Error(
+      "Buffer returned no deletePost response."
+    );
+  }
+
+  if (response.message) {
+    throw new Error(
+      `Buffer: ${response.message}`
+    );
+  }
+
+  if (!response.id) {
+    throw new Error(
+      "Buffer did not confirm deletion."
+    );
+  }
+
+  return response.id;
+}
+
 async function getContentItem(id) {
   const response = await fetch(
     `${SUPABASE_URL}/rest/v1/content_queue?id=eq.${encodeURIComponent(
       id
     )}&select=*`,
     {
-      headers: supabaseHeaders(),
+      headers:
+        supabaseHeaders(),
       cache: "no-store",
     }
   );
 
-  const data = await response.json();
+  const data =
+    await response.json();
 
   if (!response.ok) {
     throw new Error(
@@ -334,14 +427,18 @@ async function updateContentItem(
     )}`,
     {
       method: "PATCH",
-      headers: supabaseHeaders({
-        Prefer: "return=representation",
-      }),
-      body: JSON.stringify(updates),
+      headers:
+        supabaseHeaders({
+          Prefer:
+            "return=representation",
+        }),
+      body:
+        JSON.stringify(updates),
     }
   );
 
-  const data = await response.json();
+  const data =
+    await response.json();
 
   if (!response.ok) {
     throw new Error(
@@ -358,26 +455,38 @@ export async function GET() {
   return Response.json({
     ok: true,
     version: VERSION,
-    adminKeyConfigured: Boolean(
-      ADMIN_CONTENT_KEY
-    ),
-    supabaseConfigured: Boolean(
-      SUPABASE_URL &&
-        SUPABASE_SECRET_KEY
-    ),
-    bufferConfigured: Boolean(
-      BUFFER_API_KEY
-    ),
+
+    adminKeyConfigured:
+      Boolean(
+        ADMIN_CONTENT_KEY
+      ),
+
+    supabaseConfigured:
+      Boolean(
+        SUPABASE_URL &&
+          SUPABASE_SECRET_KEY
+      ),
+
+    bufferConfigured:
+      Boolean(
+        BUFFER_API_KEY
+      ),
   });
 }
 
-export async function POST(request) {
+export async function POST(
+  request
+) {
   try {
-    const body = await request.json();
+    const body =
+      await request.json();
+
     const adminKey =
       body?.adminKey || "";
 
-    if (!isAuthorized(adminKey)) {
+    if (
+      !isAuthorized(adminKey)
+    ) {
       return Response.json(
         {
           ok: false,
@@ -387,9 +496,12 @@ export async function POST(request) {
           receivedLength:
             adminKey.length,
           expectedLength:
-            ADMIN_CONTENT_KEY?.length || 0,
+            ADMIN_CONTENT_KEY
+              ?.length || 0,
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
@@ -404,19 +516,24 @@ export async function POST(request) {
           error:
             "Supabase configuration is missing.",
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
-    const response = await fetch(
-      `${SUPABASE_URL}/rest/v1/content_queue?select=*&order=created_at.desc`,
-      {
-        headers: supabaseHeaders(),
-        cache: "no-store",
-      }
-    );
+    const response =
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/content_queue?select=*&order=created_at.desc`,
+        {
+          headers:
+            supabaseHeaders(),
+          cache: "no-store",
+        }
+      );
 
-    const data = await response.json();
+    const data =
+      await response.json();
 
     if (!response.ok) {
       return Response.json(
@@ -429,7 +546,8 @@ export async function POST(request) {
             "Could not load content.",
         },
         {
-          status: response.status,
+          status:
+            response.status,
         }
       );
     }
@@ -449,21 +567,35 @@ export async function POST(request) {
             ? error.message
             : "Unknown error",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
 
-export async function PATCH(request) {
+export async function PATCH(
+  request
+) {
   try {
-    const body = await request.json();
+    const body =
+      await request.json();
 
     const adminKey =
       body?.adminKey || "";
-    const id = body?.id;
-    const status = body?.status;
 
-    if (!isAuthorized(adminKey)) {
+    const id =
+      body?.id;
+
+    const status =
+      body?.status;
+
+    const action =
+      body?.action;
+
+    if (
+      !isAuthorized(adminKey)
+    ) {
       return Response.json(
         {
           ok: false,
@@ -471,7 +603,9 @@ export async function PATCH(request) {
           error:
             "Incorrect admin password.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
@@ -486,7 +620,9 @@ export async function PATCH(request) {
           error:
             "Supabase configuration is missing.",
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
@@ -497,54 +633,148 @@ export async function PATCH(request) {
           error:
             "Missing content ID.",
         },
-        { status: 400 }
-      );
-    }
-
-    if (!allowedStatuses.includes(status)) {
-      return Response.json(
         {
-          ok: false,
-          error:
-            "Invalid status.",
-        },
-        { status: 400 }
+          status: 400,
+        }
       );
     }
 
-    if (status === "approved") {
-      let item;
+    /*
+      CANCEL SCHEDULE
+    */
+
+    if (
+      action ===
+      "cancel_schedule"
+    ) {
+      const item =
+        await getContentItem(id);
+
+      if (
+        item.status !==
+        "scheduled"
+      ) {
+        return Response.json(
+          {
+            ok: false,
+            error:
+              "Only scheduled content can be cancelled.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      if (
+        !item.buffer_post_id
+      ) {
+        return Response.json(
+          {
+            ok: false,
+            error:
+              "This item has no Buffer post ID.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
 
       try {
-        item =
-          await getContentItem(id);
-
-        const bufferPost =
-          await createBufferPost(item);
+        await deleteBufferPost(
+          item.buffer_post_id
+        );
 
         const updated =
           await updateContentItem(
             id,
             {
-              status: "scheduled",
+              status:
+                "ready_for_review",
+
               buffer_post_id:
-                bufferPost.id,
-              error_message: null,
+                null,
+
+              error_message:
+                null,
             }
           );
 
         return Response.json({
           ok: true,
           version: VERSION,
+          action:
+            "cancel_schedule",
+          item: updated,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unknown Buffer error";
+
+        return Response.json(
+          {
+            ok: false,
+            version: VERSION,
+            error: message,
+          },
+          {
+            status: 500,
+          }
+        );
+      }
+    }
+
+    /*
+      APPROVE + BUFFER
+    */
+
+    if (
+      status === "approved"
+    ) {
+      try {
+        const item =
+          await getContentItem(id);
+
+        const bufferPost =
+          await createBufferPost(
+            item
+          );
+
+        const updated =
+          await updateContentItem(
+            id,
+            {
+              status:
+                "scheduled",
+
+              buffer_post_id:
+                bufferPost.id,
+
+              error_message:
+                null,
+            }
+          );
+
+        return Response.json({
+          ok: true,
+          version: VERSION,
+
           buffer: {
-            id: bufferPost.id,
+            id:
+              bufferPost.id,
+
             status:
               bufferPost.status ||
               null,
+
             dueAt:
               bufferPost.dueAt ||
               null,
           },
+
           item: updated,
         });
       } catch (error) {
@@ -557,13 +787,15 @@ export async function PATCH(request) {
           await updateContentItem(
             id,
             {
-              status: "failed",
+              status:
+                "failed",
+
               error_message:
                 message,
             }
           );
         } catch {
-          // Avoid masking the original Buffer error.
+          // Keep original error.
         }
 
         return Response.json(
@@ -572,9 +804,32 @@ export async function PATCH(request) {
             version: VERSION,
             error: message,
           },
-          { status: 500 }
+          {
+            status: 500,
+          }
         );
       }
+    }
+
+    /*
+      NORMAL STATUS CHANGE
+    */
+
+    if (
+      !allowedStatuses.includes(
+        status
+      )
+    ) {
+      return Response.json(
+        {
+          ok: false,
+          error:
+            "Invalid status.",
+        },
+        {
+          status: 400,
+        }
+      );
     }
 
     const updated =
@@ -582,7 +837,8 @@ export async function PATCH(request) {
         id,
         {
           status,
-          error_message: null,
+          error_message:
+            null,
         }
       );
 
@@ -601,7 +857,9 @@ export async function PATCH(request) {
             ? error.message
             : "Unknown error",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
