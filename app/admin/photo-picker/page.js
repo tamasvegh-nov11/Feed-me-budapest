@@ -2,58 +2,96 @@
 
 import { useEffect, useState } from "react";
 
-const RESTAURANT = {
-  id: "R001",
-  name: "Salve Pizza Napoletana Basilica",
-  placeId: "ChIJgSWQgAvdQUcRGzU1QwbpYmU",
-};
+const RESTAURANTS = [
+  {
+    id: "R001",
+    name: "Salve Pizza Napoletana Basilica",
+    placeId: "ChIJgSWQgAvdQUcRGzU1QwbpYmU",
+  },
+  {
+    id: "R039",
+    name: "Belli di Mamma",
+    placeId: "ChIJaT-TvHvdQUcRFcrZe9yRo5E",
+  },
+  {
+    id: "R002",
+    name: "Forni di Napoli Bazilika",
+    placeId: "ChIJ2cIAf0PdQUcReG6rO0niG4k",
+  },
+];
 
 export default function PhotoPickerPage() {
+  const [restaurantId, setRestaurantId] =
+    useState(RESTAURANTS[0].id);
+
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savingIndex, setSavingIndex] = useState(null);
   const [selected, setSelected] = useState(null);
+
   const [slideUrl, setSlideUrl] = useState("");
   const [slideLoading, setSlideLoading] = useState(false);
+
   const [error, setError] = useState("");
 
+  const restaurant =
+    RESTAURANTS.find(
+      (item) => item.id === restaurantId
+    ) || RESTAURANTS[0];
+
   useEffect(() => {
+    setSelected(null);
+    setSlideUrl("");
     loadPhotos();
-  }, []);
+  }, [restaurantId]);
 
   async function loadPhotos() {
     setLoading(true);
     setError("");
+    setPhotos([]);
 
     try {
       const results = await Promise.all(
-        Array.from({ length: 6 }, async (_, index) => {
-          const response = await fetch(
-            `/api/place-photo?placeId=${encodeURIComponent(
-              RESTAURANT.placeId
-            )}&index=${index}`,
-            {
-              cache: "no-store",
+        Array.from(
+          { length: 8 },
+          async (_, index) => {
+            const response = await fetch(
+              `/api/place-photo?placeId=${encodeURIComponent(
+                restaurant.placeId
+              )}&index=${index}`,
+              {
+                cache: "no-store",
+              }
+            );
+
+            const data =
+              await response.json();
+
+            if (
+              !response.ok ||
+              !data?.url
+            ) {
+              return {
+                index,
+                url: null,
+                error:
+                  data?.error ||
+                  "Photo unavailable",
+              };
             }
-          );
 
-          const data = await response.json();
-
-          if (!response.ok || !data?.url) {
             return {
               index,
-              url: null,
-              error: data?.error || "Photo unavailable",
+              url: data.url,
+              attribution:
+                data.attribution ||
+                null,
+              attributionUri:
+                data.attributionUri ||
+                null,
             };
           }
-
-          return {
-            index,
-            url: data.url,
-            attribution: data.attribution || null,
-            attributionUri: data.attributionUri || null,
-          };
-        })
+        )
       );
 
       setPhotos(results);
@@ -68,7 +106,9 @@ export default function PhotoPickerPage() {
     }
   }
 
-  async function buildSlide(publicUrl) {
+  async function buildSlide(
+    publicUrl
+  ) {
     setSlideLoading(true);
     setSlideUrl("");
     setError("");
@@ -79,25 +119,34 @@ export default function PhotoPickerPage() {
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
           body: JSON.stringify({
-            restaurantId: RESTAURANT.id,
+            restaurantId:
+              restaurant.id,
             photoUrl: publicUrl,
           }),
         }
       );
 
       if (!response.ok) {
-        const data = await response.json().catch(() => null);
+        const data =
+          await response
+            .json()
+            .catch(() => null);
 
         throw new Error(
-          data?.error || "Could not generate slide."
+          data?.error ||
+            "Could not generate slide."
         );
       }
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const blob =
+        await response.blob();
+
+      const url =
+        URL.createObjectURL(blob);
 
       setSlideUrl(url);
     } catch (err) {
@@ -124,34 +173,47 @@ export default function PhotoPickerPage() {
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
           body: JSON.stringify({
-            restaurantId: RESTAURANT.id,
-            restaurantName: RESTAURANT.name,
-            photoIndex: photo.index,
-            sourceUrl: photo.url,
+            restaurantId:
+              restaurant.id,
+            restaurantName:
+              restaurant.name,
+            photoIndex:
+              photo.index,
+            sourceUrl:
+              photo.url,
           }),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data?.error || "Could not save photo."
+          data?.error ||
+            "Could not save photo."
         );
       }
 
       const selectedPhoto = {
         ...photo,
-        publicUrl: data.publicUrl,
-        storagePath: data.storagePath,
+        publicUrl:
+          data.publicUrl,
+        storagePath:
+          data.storagePath,
       };
 
-      setSelected(selectedPhoto);
+      setSelected(
+        selectedPhoto
+      );
 
-      await buildSlide(data.publicUrl);
+      await buildSlide(
+        data.publicUrl
+      );
     } catch (err) {
       setError(
         err instanceof Error
@@ -175,8 +237,37 @@ export default function PhotoPickerPage() {
         </h1>
 
         <p style={styles.subtitle}>
-          {RESTAURANT.name}
+          Build restaurant slides for the
+          Budapest Pizza Guide.
         </p>
+
+        <div
+          style={
+            styles.restaurantTabs
+          }
+        >
+          {RESTAURANTS.map(
+            (item) => (
+              <button
+                key={item.id}
+                onClick={() =>
+                  setRestaurantId(
+                    item.id
+                  )
+                }
+                style={{
+                  ...styles.restaurantButton,
+                  ...(restaurantId ===
+                  item.id
+                    ? styles.activeRestaurantButton
+                    : {}),
+                }}
+              >
+                {item.name}
+              </button>
+            )
+          )}
+        </div>
       </div>
 
       {error && (
@@ -187,97 +278,162 @@ export default function PhotoPickerPage() {
 
       {selected && (
         <div style={styles.success}>
-          <strong>✓ Photo selected and cached</strong>
+          <strong>
+            ✓ Photo selected and cached
+          </strong>
 
-          <div style={styles.successText}>
-            Photo #{selected.index + 1} is stored in
-            Feed Me Budapest media storage.
+          <div
+            style={
+              styles.successText
+            }
+          >
+            Photo #
+            {selected.index + 1} for{" "}
+            {restaurant.name} is now
+            stored in Feed Me Budapest
+            media storage.
           </div>
-
-          <img
-            src={selected.publicUrl}
-            alt="Selected restaurant"
-            style={styles.selectedImage}
-          />
         </div>
       )}
 
       {slideLoading && (
-        <div style={styles.loadingBox}>
-          Building Feed Me Budapest slide…
+        <div
+          style={
+            styles.loadingBox
+          }
+        >
+          Building Feed Me Budapest
+          slide…
         </div>
       )}
 
       {slideUrl && (
-        <div style={styles.slideSection}>
-          <div style={styles.eyebrow}>
+        <div
+          style={
+            styles.slideSection
+          }
+        >
+          <div
+            style={styles.eyebrow}
+          >
             GENERATED SLIDE
           </div>
 
-          <h2 style={styles.slideTitle}>
-            Feed Me Budapest preview
+          <h2
+            style={
+              styles.slideTitle
+            }
+          >
+            {restaurant.name}
           </h2>
 
           <img
             src={slideUrl}
-            alt="Generated Feed Me Budapest restaurant slide"
-            style={styles.slideImage}
+            alt={`Generated slide for ${restaurant.name}`}
+            style={
+              styles.slideImage
+            }
           />
         </div>
       )}
 
       {loading ? (
-        <div style={styles.loading}>
+        <div
+          style={styles.loading}
+        >
           Loading photos…
         </div>
       ) : (
         <div style={styles.grid}>
-          {photos.map((photo) => (
-            <div
-              key={photo.index}
-              style={styles.card}
-            >
-              {photo.url ? (
-                <>
-                  <div style={styles.photoNumber}>
-                    Photo {photo.index + 1}
-                  </div>
-
-                  <img
-                    src={photo.url}
-                    alt={`${RESTAURANT.name} ${photo.index + 1}`}
-                    style={styles.image}
-                  />
-
-                  {photo.attribution && (
-                    <div style={styles.attribution}>
-                      Photo: {photo.attribution}
+          {photos.map(
+            (photo) => (
+              <div
+                key={
+                  photo.index
+                }
+                style={
+                  styles.card
+                }
+              >
+                {photo.url ? (
+                  <>
+                    <div
+                      style={
+                        styles.photoNumber
+                      }
+                    >
+                      Photo{" "}
+                      {photo.index +
+                        1}
                     </div>
-                  )}
 
-                  <button
-                    onClick={() => usePhoto(photo)}
-                    disabled={savingIndex !== null}
-                    style={{
-                      ...styles.button,
-                      opacity:
-                        savingIndex !== null ? 0.6 : 1,
-                    }}
+                    <img
+                      src={
+                        photo.url
+                      }
+                      alt={`${restaurant.name} ${
+                        photo.index +
+                        1
+                      }`}
+                      style={
+                        styles.image
+                      }
+                    />
+
+                    {photo.attribution && (
+                      <div
+                        style={
+                          styles.attribution
+                        }
+                      >
+                        Photo:{" "}
+                        {
+                          photo.attribution
+                        }
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() =>
+                        usePhoto(
+                          photo
+                        )
+                      }
+                      disabled={
+                        savingIndex !==
+                        null
+                      }
+                      style={{
+                        ...styles.button,
+                        opacity:
+                          savingIndex !==
+                          null
+                            ? 0.6
+                            : 1,
+                      }}
+                    >
+                      {savingIndex ===
+                      photo.index
+                        ? "Saving…"
+                        : "Use this photo"}
+                    </button>
+                  </>
+                ) : (
+                  <div
+                    style={
+                      styles.unavailable
+                    }
                   >
-                    {savingIndex === photo.index
-                      ? "Saving…"
-                      : "Use this photo"}
-                  </button>
-                </>
-              ) : (
-                <div style={styles.unavailable}>
-                  Photo {photo.index + 1}
-                  <br />
-                  unavailable
-                </div>
-              )}
-            </div>
-          ))}
+                    Photo{" "}
+                    {photo.index +
+                      1}
+                    <br />
+                    unavailable
+                  </div>
+                )}
+              </div>
+            )
+          )}
         </div>
       )}
     </main>
@@ -293,7 +449,8 @@ const styles = {
     background: cream,
     color: green,
     padding: "32px 16px 80px",
-    fontFamily: "Arial, sans-serif",
+    fontFamily:
+      "Arial, sans-serif",
     boxSizing: "border-box",
   },
 
@@ -309,8 +466,10 @@ const styles = {
   },
 
   title: {
-    fontFamily: "Georgia, serif",
-    fontSize: "clamp(38px,7vw,64px)",
+    fontFamily:
+      "Georgia, serif",
+    fontSize:
+      "clamp(38px,7vw,64px)",
     margin: "8px 0",
   },
 
@@ -320,9 +479,35 @@ const styles = {
     fontSize: 16,
   },
 
+  restaurantTabs: {
+    display: "flex",
+    gap: 8,
+    overflowX: "auto",
+    marginTop: 24,
+    paddingBottom: 5,
+  },
+
+  restaurantButton: {
+    border:
+      "1px solid #073b2d",
+    background:
+      "transparent",
+    color: green,
+    borderRadius: 30,
+    padding: "11px 16px",
+    whiteSpace: "nowrap",
+    fontWeight: 700,
+  },
+
+  activeRestaurantButton: {
+    background: green,
+    color: cream,
+  },
+
   error: {
     maxWidth: 1100,
-    margin: "0 auto 20px",
+    margin:
+      "0 auto 20px",
     background: "#f8dddd",
     padding: 16,
     borderRadius: 12,
@@ -330,7 +515,8 @@ const styles = {
 
   success: {
     maxWidth: 1100,
-    margin: "0 auto 24px",
+    margin:
+      "0 auto 24px",
     background: "#e2ebdf",
     padding: 18,
     borderRadius: 16,
@@ -338,45 +524,44 @@ const styles = {
 
   successText: {
     marginTop: 6,
-    marginBottom: 16,
     opacity: 0.75,
-  },
-
-  selectedImage: {
-    width: "100%",
-    maxWidth: 380,
-    borderRadius: 14,
-    display: "block",
   },
 
   loadingBox: {
     maxWidth: 1100,
-    margin: "0 auto 24px",
+    margin:
+      "0 auto 24px",
     padding: 16,
     borderRadius: 14,
     background: "#fffdf7",
-    border: "1px solid #ddd7ca",
+    border:
+      "1px solid #ddd7ca",
   },
 
   slideSection: {
     maxWidth: 1100,
-    margin: "0 auto 32px",
+    margin:
+      "0 auto 32px",
     padding: 20,
     background: "#fffdf7",
-    border: "1px solid #ddd7ca",
+    border:
+      "1px solid #ddd7ca",
     borderRadius: 18,
   },
 
   slideTitle: {
-    fontFamily: "Georgia, serif",
+    fontFamily:
+      "Georgia, serif",
     fontSize: 30,
-    margin: "8px 0 18px",
+    margin:
+      "8px 0 18px",
   },
 
   slideImage: {
     width: "100%",
     maxWidth: 540,
-    aspectRatio: "4 / 5",
+    aspectRatio:
+      "4 / 5",
     objectFit: "cover",
     borderRadius: 14,
     display: "block",
@@ -384,7 +569,8 @@ const styles = {
 
   loading: {
     maxWidth: 1100,
-    margin: "60px auto",
+    margin:
+      "60px auto",
     textAlign: "center",
     opacity: 0.6,
   },
@@ -400,7 +586,8 @@ const styles = {
 
   card: {
     background: "#fffdf7",
-    border: "1px solid #ddd7ca",
+    border:
+      "1px solid #ddd7ca",
     borderRadius: 18,
     padding: 14,
     overflow: "hidden",
@@ -415,7 +602,8 @@ const styles = {
 
   image: {
     width: "100%",
-    aspectRatio: "4 / 5",
+    aspectRatio:
+      "4 / 5",
     objectFit: "cover",
     borderRadius: 12,
     display: "block",
