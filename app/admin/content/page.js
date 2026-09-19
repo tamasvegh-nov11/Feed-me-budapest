@@ -1,8 +1,8 @@
- "use client";
+"use client";
 
 import { useEffect, useState } from "react";
 
-const VERSION = "FMB-ADMIN-V3";
+const VERSION = "FMB-ADMIN-V6";
 
 const STATUS_LABELS = {
   ready_for_review: "Pending",
@@ -64,7 +64,9 @@ export default function ContentAdminPage() {
           );
         }
 
-        throw new Error(data.error || "Could not load content.");
+        throw new Error(
+          data.error || "Could not load content."
+        );
       }
 
       setAuthenticated(true);
@@ -134,11 +136,60 @@ export default function ContentAdminPage() {
 
       setMessage(
         status === "approved"
-          ? "✓ Content approved"
+          ? "✓ Content approved and sent to Buffer"
           : "Content rejected"
       );
 
       setSelected(null);
+      await loadContent(adminKey);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unknown error"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function cancelSchedule(id) {
+    const confirmed = window.confirm(
+      "Cancel this scheduled Buffer post and move it back to Pending?"
+    );
+
+    if (!confirmed) return;
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/content", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          adminKey,
+          id,
+          action: "cancel_schedule",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Could not cancel schedule."
+        );
+      }
+
+      setMessage(
+        "✓ Schedule cancelled. Content moved back to Pending."
+      );
+
+      setSelected(null);
+      setFilter("ready_for_review");
 
       await loadContent(adminKey);
     } catch (error) {
@@ -326,6 +377,14 @@ export default function ContentAdminPage() {
                     {item.topic}
                   </div>
                 )}
+
+                {item.publish_at && (
+                  <div style={styles.date}>
+                    {new Date(
+                      item.publish_at
+                    ).toLocaleString()}
+                  </div>
+                )}
               </button>
             ))}
           </div>
@@ -446,6 +505,22 @@ export default function ContentAdminPage() {
                       style={styles.reject}
                     >
                       Reject
+                    </button>
+                  </div>
+                )}
+
+                {selected.status ===
+                  "scheduled" && (
+                  <div style={styles.actions}>
+                    <button
+                      onClick={() =>
+                        cancelSchedule(
+                          selected.id
+                        )
+                      }
+                      style={styles.cancel}
+                    >
+                      Cancel schedule
                     </button>
                   </div>
                 )}
@@ -694,6 +769,12 @@ const styles = {
     opacity: 0.7,
   },
 
+  date: {
+    marginTop: 12,
+    fontSize: 12,
+    opacity: 0.55,
+  },
+
   preview: {
     background: "#fffdf7",
     borderRadius: 20,
@@ -799,6 +880,16 @@ const styles = {
     color: green,
     padding: 15,
     borderRadius: 12,
+  },
+
+  cancel: {
+    width: "100%",
+    border: "1px solid #9b2c2c",
+    background: "#fff7f7",
+    color: "#9b2c2c",
+    padding: 15,
+    borderRadius: 12,
+    fontWeight: 700,
   },
 
   empty: {
