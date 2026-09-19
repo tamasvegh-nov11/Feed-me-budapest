@@ -62,18 +62,8 @@ function getCachedPhotoUrl(
   restaurantId,
   photoIndex
 ) {
-  /*
-    We stored the selected Google photo
-    under this deterministic path.
-  */
-
   const id =
     restaurantId.toLowerCase();
-
-  /*
-    Selected source files can be JPG or PNG.
-    We first try JPG, then PNG.
-  */
 
   return {
     jpg:
@@ -165,17 +155,22 @@ async function buildAndCacheSlide(
 async function createQueueItem(
   slideUrls
 ) {
-  const caption = `Looking for pizza in Budapest? 🍕
+  const caption = `Pizza in Budapest? Start here. 🍕
 
-Here are 3 spots worth saving for your trip:
+Three spots, three different reasons to go.
 
-1. Salve Pizza Napoletana Basilica
-2. Belli di Mamma
-3. Forni di Napoli Bazilika
+Salve Pizza Napoletana Basilica
+Light, proper Neapolitan pizza right by St. Stephen’s Basilica — and one of those places where the service actually adds to the experience.
 
-Each one made the Feed Me Budapest guide for a different reason.
+Belli di Mamma
+A strong city-centre pizza stop with plenty of character. Worth keeping in mind when you’re around the New York Café side of town.
 
-Save this post for later and discover more Budapest food picks at feedme-budapest.com.
+Forni di Napoli Bazilika
+A busy, established Neapolitan-style favourite near the Basilica — a solid option when you want pizza in the heart of Budapest.
+
+No ranking. Just three places we think are worth knowing.
+
+Save this for your next Budapest pizza night.
 
 #budapestpizza #budapestfood #budapestguide #neapolitanpizza #feedmebudapest`;
 
@@ -237,7 +232,7 @@ Save this post for later and discover more Budapest food picks at feedme-budapes
           "ready_for_review",
 
         generation_notes:
-          "Automatically assembled from selected restaurant photos and Feed Me Budapest branded restaurant-slide template.",
+          "Automatically assembled from selected restaurant photos and Feed Me Budapest branded restaurant-slide template. Editorial caption v2.",
       }),
     }
   );
