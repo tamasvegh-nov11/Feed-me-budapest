@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-const VERSION = "FMB-ADMIN-V7";
+const VERSION = "FMB-ADMIN-V6";
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL?.trim();
@@ -13,8 +13,6 @@ const ADMIN_CONTENT_KEY =
 
 const BUFFER_API_KEY =
   process.env.BUFFER_API_KEY?.trim();
-
-const BUCKET = "feed-media";
 
 const allowedStatuses = [
   "draft",
@@ -42,34 +40,6 @@ function supabaseHeaders(extra = {}) {
   };
 }
 
-function escapeGraphQL(value = "") {
-  return String(value)
-    .replaceAll("\\", "\\\\")
-    .replaceAll('"', '\\"')
-    .replaceAll("\n", "\\n")
-    .replaceAll("\r", "");
-}
-
-function safeFilePart(value = "") {
-  return String(value)
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9-_]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-function normalizeMediaUrls(value) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.filter(
-    (url) =>
-      typeof url === "string" &&
-      url.startsWith("https://")
-  );
-}
-
 async function bufferQuery(query) {
   if (!BUFFER_API_KEY) {
     throw new Error(
@@ -82,8 +52,7 @@ async function bufferQuery(query) {
     {
       method: "POST",
       headers: {
-        "Content-Type":
-          "application/json",
+        "Content-Type": "application/json",
         Authorization:
           `Bearer ${BUFFER_API_KEY}`,
       },
@@ -94,8 +63,7 @@ async function bufferQuery(query) {
     }
   );
 
-  const data =
-    await response.json();
+  const data = await response.json();
 
   if (!response.ok) {
     throw new Error(
@@ -173,6 +141,26 @@ async function getInstagramChannelId() {
   );
 }
 
+function escapeGraphQL(value = "") {
+  return String(value)
+    .replaceAll("\\", "\\\\")
+    .replaceAll('"', '\\"')
+    .replaceAll("\n", "\\n")
+    .replaceAll("\r", "");
+}
+
+function normalizeMediaUrls(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(
+    (url) =>
+      typeof url === "string" &&
+      url.startsWith("https://")
+  );
+}
+
 function instagramMetadata(
   contentType
 ) {
@@ -198,16 +186,15 @@ function instagramMetadata(
     `;
   }
 
-  if (contentType === "carousel") {
-    return `
-      metadata: {
-        instagram: {
-          type: carousel
-          shouldShareToFeed: true
-        }
-      }
-    `;
-  }
+  /*
+    IMPORTANT:
+    Buffer does NOT accept "carousel"
+    as an Instagram post type.
+
+    Multiple-image Instagram carousels
+    are sent as type: post with multiple
+    image assets.
+  */
 
   return `
     metadata: {
@@ -349,9 +336,7 @@ async function deleteBufferPost(
   bufferPostId
 ) {
   const safeId =
-    escapeGraphQL(
-      bufferPostId
-    );
+    escapeGraphQL(bufferPostId);
 
   const mutation = `
     mutation DeletePost {
@@ -446,9 +431,7 @@ async function updateContentItem(
             "return=representation",
         }),
       body:
-        JSON.stringify(
-          updates
-        ),
+        JSON.stringify(updates),
     }
   );
 
@@ -464,171 +447,6 @@ async function updateContentItem(
   }
 
   return data?.[0] || null;
-}
-
-async function getRestaurantsByIds(
-  ids
-) {
-  if (!Array.isArray(ids) || !ids.length) {
-    return [];
-  }
-
-  const encodedIds =
-    ids
-      .map(
-        (id) =>
-          `"${String(id)
-            .replaceAll('"', "")}"`
-      )
-      .join(",");
-
-  const response = await fetch(
-    `${SUPABASE_URL}/rest/v1/feed_restaurants?id=in.(${encodedIds})&select=id,name,google_place_id,google_photo_index`,
-    {
-      headers:
-        supabaseHeaders(),
-      cache: "no-store",
-    }
-  );
-
-  const data =
-    await response.json();
-
-  if (!response.ok) {
-    throw new Error(
-      data?.message ||
-        data?.error ||
-        "Could not load restaurant photo data."
-    );
-  }
-
-  return data || [];
-}
-
-async function uploadImageToStorage({
-  restaurantId,
-  photoIndex,
-  imageBytes,
-  contentType,
-}) {
-  const extension =
-    contentType.includes("png")
-      ? "png"
-      : contentType.includes("webp")
-      ? "webp"
-      : "jpg";
-
-  const safeId =
-    safeFilePart(
-      restaurantId
-    ) || "restaurant";
-
-  const path =
-    `restaurants/${safeId}/photo-${photoIndex}.${extension}`;
-
-  const uploadResponse =
-    await fetch(
-      `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`,
-      {
-        method: "POST",
-        headers: {
-          apikey:
-            SUPABASE_SECRET_KEY,
-          Authorization:
-            `Bearer ${SUPABASE_SECRET_KEY}`,
-          "Content-Type":
-            contentType,
-          "x-upsert": "true",
-        },
-        body: imageBytes,
-      }
-    );
-
-  const uploadData =
-    await uploadResponse
-      .json()
-      .catch(() => null);
-
-  if (!uploadResponse.ok) {
-    throw new Error(
-      uploadData?.message ||
-        uploadData?.error ||
-        `Could not upload image for ${restaurantId}.`
-    );
-  }
-
-  return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
-}
-
-async function cacheRestaurantPhoto({
-  origin,
-  restaurant,
-}) {
-  if (!restaurant.google_place_id) {
-    throw new Error(
-      `${restaurant.name} has no Google Place ID.`
-    );
-  }
-
-  const photoIndex =
-    Number(
-      restaurant.google_photo_index ||
-        0
-    );
-
-  const sourceUrl =
-    `${origin}/api/place-photo?placeId=${encodeURIComponent(
-      restaurant.google_place_id
-    )}&photoIndex=${photoIndex}`;
-
-  const sourceResponse =
-    await fetch(
-      sourceUrl,
-      {
-        cache: "no-store",
-      }
-    );
-
-  if (!sourceResponse.ok) {
-    throw new Error(
-      `${restaurant.name}: source photo failed (${sourceResponse.status}).`
-    );
-  }
-
-  const contentType =
-    sourceResponse.headers.get(
-      "content-type"
-    ) || "image/jpeg";
-
-  if (
-    !contentType.startsWith(
-      "image/"
-    )
-  ) {
-    throw new Error(
-      `${restaurant.name}: source did not return an image.`
-    );
-  }
-
-  const imageBytes =
-    await sourceResponse.arrayBuffer();
-
-  const publicUrl =
-    await uploadImageToStorage({
-      restaurantId:
-        restaurant.id,
-      photoIndex,
-      imageBytes,
-      contentType,
-    });
-
-  return {
-    restaurantId:
-      restaurant.id,
-    name:
-      restaurant.name,
-    publicUrl,
-  };
 }
 
 export async function GET() {
@@ -665,9 +483,7 @@ export async function POST(
       body?.adminKey || "";
 
     if (
-      !isAuthorized(
-        adminKey
-      )
+      !isAuthorized(adminKey)
     ) {
       return Response.json(
         {
@@ -776,9 +592,7 @@ export async function PATCH(
       body?.action;
 
     if (
-      !isAuthorized(
-        adminKey
-      )
+      !isAuthorized(adminKey)
     ) {
       return Response.json(
         {
@@ -824,159 +638,6 @@ export async function PATCH(
     }
 
     /*
-      PREPARE PHOTOS
-    */
-
-    if (
-      action ===
-      "prepare_photos"
-    ) {
-      const item =
-        await getContentItem(
-          id
-        );
-
-      const restaurantIds =
-        Array.isArray(
-          item.source_restaurant_ids
-        )
-          ? item.source_restaurant_ids
-          : [];
-
-      if (
-        restaurantIds.length ===
-        0
-      ) {
-        return Response.json(
-          {
-            ok: false,
-            error:
-              "This content item has no source restaurants.",
-          },
-          {
-            status: 400,
-          }
-        );
-      }
-
-      const restaurants =
-        await getRestaurantsByIds(
-          restaurantIds
-        );
-
-      const orderedRestaurants =
-        restaurantIds
-          .map(
-            (restaurantId) =>
-              restaurants.find(
-                (restaurant) =>
-                  restaurant.id ===
-                  restaurantId
-              )
-          )
-          .filter(Boolean);
-
-      const origin =
-        new URL(
-          request.url
-        ).origin;
-
-      const prepared = [];
-      const errors = [];
-
-      for (
-        const restaurant of
-        orderedRestaurants
-      ) {
-        try {
-          const result =
-            await cacheRestaurantPhoto({
-              origin,
-              restaurant,
-            });
-
-          prepared.push(
-            result
-          );
-        } catch (error) {
-          errors.push({
-            restaurantId:
-              restaurant.id,
-            name:
-              restaurant.name,
-            error:
-              error instanceof Error
-                ? error.message
-                : "Unknown photo error",
-          });
-        }
-      }
-
-      if (
-        prepared.length === 0
-      ) {
-        throw new Error(
-          errors
-            .map(
-              (entry) =>
-                `${entry.name}: ${entry.error}`
-            )
-            .join("; ")
-        );
-      }
-
-      const existingMedia =
-        normalizeMediaUrls(
-          item.media_urls
-        );
-
-      const coverUrl =
-        existingMedia.length > 0
-          ? existingMedia[0]
-          : null;
-
-      const newMediaUrls = [
-        ...(coverUrl
-          ? [coverUrl]
-          : []),
-
-        ...prepared.map(
-          (entry) =>
-            entry.publicUrl
-        ),
-      ];
-
-      const updated =
-        await updateContentItem(
-          id,
-          {
-            media_urls:
-              newMediaUrls,
-
-            error_message:
-              errors.length
-                ? errors
-                    .map(
-                      (entry) =>
-                        `${entry.name}: ${entry.error}`
-                    )
-                    .join("; ")
-                : null,
-          }
-        );
-
-      return Response.json({
-        ok: true,
-        version: VERSION,
-        action:
-          "prepare_photos",
-        prepared,
-        errors,
-        item: updated,
-      });
-    }
-
-    /*
       CANCEL SCHEDULE
     */
 
@@ -985,9 +646,7 @@ export async function PATCH(
       "cancel_schedule"
     ) {
       const item =
-        await getContentItem(
-          id
-        );
+        await getContentItem(id);
 
       if (
         item.status !==
@@ -1057,8 +716,7 @@ export async function PATCH(
           {
             ok: false,
             version: VERSION,
-            error:
-              message,
+            error: message,
           },
           {
             status: 500,
@@ -1068,18 +726,15 @@ export async function PATCH(
     }
 
     /*
-      APPROVE + BUFFER
+      APPROVE + SEND TO BUFFER
     */
 
     if (
-      status ===
-      "approved"
+      status === "approved"
     ) {
       try {
         const item =
-          await getContentItem(
-            id
-          );
+          await getContentItem(id);
 
         const bufferPost =
           await createBufferPost(
@@ -1138,15 +793,14 @@ export async function PATCH(
             }
           );
         } catch {
-          //
+          // Keep original error.
         }
 
         return Response.json(
           {
             ok: false,
             version: VERSION,
-            error:
-              message,
+            error: message,
           },
           {
             status: 500,
