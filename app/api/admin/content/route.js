@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-const VERSION = "FMB-ADMIN-V6";
+const VERSION = "FMB-ADMIN-V7";
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL?.trim();
@@ -52,7 +52,8 @@ async function bufferQuery(query) {
     {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type":
+          "application/json",
         Authorization:
           `Bearer ${BUFFER_API_KEY}`,
       },
@@ -187,13 +188,8 @@ function instagramMetadata(
   }
 
   /*
-    IMPORTANT:
-    Buffer does NOT accept "carousel"
-    as an Instagram post type.
-
-    Multiple-image Instagram carousels
-    are sent as type: post with multiple
-    image assets.
+    Instagram carousel is still sent to Buffer
+    as type: post with multiple image assets.
   */
 
   return `
@@ -694,6 +690,9 @@ export async function PATCH(
               buffer_post_id:
                 null,
 
+              publish_at:
+                null,
+
               error_message:
                 null,
             }
@@ -741,6 +740,12 @@ export async function PATCH(
             item
           );
 
+        /*
+          IMPORTANT CHANGE:
+          Buffer returns dueAt.
+          We now save it to publish_at.
+        */
+
         const updated =
           await updateContentItem(
             id,
@@ -750,6 +755,11 @@ export async function PATCH(
 
               buffer_post_id:
                 bufferPost.id,
+
+              publish_at:
+                bufferPost.dueAt ||
+                item.publish_at ||
+                null,
 
               error_message:
                 null,
