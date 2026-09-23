@@ -16,25 +16,18 @@ const TOPICS = {
   coffee: {
     title:
       "3 coffee spots worth crossing town for in Budapest",
-
-    topic:
-      "coffee-guide",
-
+    topic: "coffee-guide",
     restaurantIds: [
-      "R079", // Kontakt
-      "R008", // Espresso Embassy
-      "R062", // Nicaragua
+      "R079",
+      "R008",
+      "R062",
     ],
-
     intro:
       "Good coffee is worth a detour. ☕️",
-
     middle:
       "Three Budapest stops, three different moods.",
-
     outro:
       "Different neighbourhoods, different atmosphere — all worth knowing.\n\nSave this for your next coffee stop in Budapest.",
-
     hashtags:
       "#budapestcoffee #specialtycoffee #budapestfood #budapestguide #feedmebudapest",
   },
@@ -42,25 +35,18 @@ const TOPICS = {
   pizza: {
     title:
       "3 pizza spots to save in Budapest",
-
-    topic:
-      "pizza-guide",
-
+    topic: "pizza-guide",
     restaurantIds: [
       "R001",
       "R039",
       "R002",
     ],
-
     intro:
       "Pizza in Budapest? Start here. 🍕",
-
     middle:
       "Three spots, three different reasons to go.",
-
     outro:
       "No ranking. Just three places we think are worth knowing.\n\nSave this for your next Budapest pizza night.",
-
     hashtags:
       "#budapestpizza #budapestfood #budapestguide #neapolitanpizza #feedmebudapest",
   },
@@ -83,120 +69,123 @@ function supabaseHeaders(extra = {}) {
 }
 
 async function loadRestaurants(ids) {
-  /*
-    IMPORTANT FIX:
-    PostgREST in.(...) should use:
-    in.(R079,R008,R062)
+  try {
+    const queryIds =
+      ids.join(",");
 
-    Not:
-    in.("R079","R008","R062")
-  */
+    const url =
+      `${SUPABASE_URL}/rest/v1/feed_restaurants` +
+      `?id=in.(${queryIds})` +
+      `&select=id,name,why_we_like_it,good_to_know,primary_area,google_place_id,google_photo_index`;
 
-  const queryIds =
-    ids.join(",");
+    const response =
+      await fetch(url, {
+        headers:
+          supabaseHeaders(),
+        cache: "no-store",
+      });
 
-  const url =
-    `${SUPABASE_URL}/rest/v1/feed_restaurants` +
-    `?id=in.(${queryIds})` +
-    `&select=id,name,why_we_like_it,good_to_know,primary_area,google_place_id,google_photo_index`;
+    const data =
+      await response.json();
 
-  const response = await fetch(
-    url,
-    {
-      headers:
-        supabaseHeaders(),
-      cache: "no-store",
+    if (!response.ok) {
+      throw new Error(
+        data?.message ||
+          data?.error ||
+          `HTTP ${response.status}`
+      );
     }
-  );
 
-  const data =
-    await response.json();
+    return ids.map((id) => {
+      const restaurant =
+        data.find(
+          (item) =>
+            item.id === id
+        );
 
-  if (!response.ok) {
+      if (!restaurant) {
+        throw new Error(
+          `Restaurant ${id} not found`
+        );
+      }
+
+      return restaurant;
+    });
+  } catch (error) {
     throw new Error(
-      data?.message ||
-        data?.error ||
-        "Could not load restaurants."
+      `STEP 1 — restaurant loading failed: ${
+        error instanceof Error
+          ? error.message
+          : String(error)
+      }`
     );
   }
-
-  /*
-    Keep exactly the same order
-    as configured in TOPICS.
-  */
-
-  return ids.map((id) => {
-    const restaurant =
-      data.find(
-        (item) =>
-          item.id === id
-      );
-
-    if (!restaurant) {
-      throw new Error(
-        `Restaurant ${id} not found.`
-      );
-    }
-
-    return restaurant;
-  });
 }
 
 async function getPlacePhoto(
   restaurant
 ) {
-  if (
-    !restaurant.google_place_id
-  ) {
-    throw new Error(
-      `Google Place ID missing for ${restaurant.name}.`
-    );
-  }
-
-  const rawIndex =
-    Number(
-      restaurant.google_photo_index
-    );
-
-  const index =
-    Number.isInteger(rawIndex)
-      ? rawIndex
-      : 0;
-
-  const url =
-    `${SITE_URL}/api/place-photo` +
-    `?placeId=${encodeURIComponent(
-      restaurant.google_place_id
-    )}` +
-    `&index=${index}`;
-
-  const response = await fetch(
-    url,
-    {
-      cache: "no-store",
+  try {
+    if (
+      !restaurant.google_place_id
+    ) {
+      throw new Error(
+        `Google Place ID missing for ${restaurant.name}`
+      );
     }
-  );
 
-  const data =
-    await response.json();
+    const parsedIndex =
+      Number(
+        restaurant.google_photo_index
+      );
 
-  if (
-    !response.ok ||
-    !data?.url
-  ) {
+    const index =
+      Number.isInteger(
+        parsedIndex
+      )
+        ? parsedIndex
+        : 0;
+
+    const url =
+      `${SITE_URL}/api/place-photo` +
+      `?placeId=${encodeURIComponent(
+        restaurant.google_place_id
+      )}` +
+      `&index=${index}`;
+
+    const response =
+      await fetch(url, {
+        cache: "no-store",
+      });
+
+    const data =
+      await response.json();
+
+    if (
+      !response.ok ||
+      !data?.url
+    ) {
+      throw new Error(
+        data?.error ||
+          `HTTP ${response.status}`
+      );
+    }
+
+    return {
+      sourceUrl:
+        data.url,
+      photoIndex:
+        index,
+    };
+  } catch (error) {
     throw new Error(
-      data?.error ||
-        `Could not get photo for ${restaurant.name}.`
+      `STEP 2 — Google photo failed for ${restaurant.name}: ${
+        error instanceof Error
+          ? error.message
+          : String(error)
+      }`
     );
   }
-
-  return {
-    sourceUrl:
-      data.url,
-
-    photoIndex:
-      index,
-  };
 }
 
 async function cachePhoto(
@@ -204,91 +193,119 @@ async function cachePhoto(
   sourceUrl,
   photoIndex
 ) {
-  const response = await fetch(
-    `${SITE_URL}/api/cache-place-photo`,
-    {
-      method: "POST",
+  try {
+    const response =
+      await fetch(
+        `${SITE_URL}/api/cache-place-photo`,
+        {
+          method: "POST",
 
-      headers: {
-        "Content-Type":
-          "application/json",
-      },
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
 
-      body: JSON.stringify({
-        restaurantId:
-          restaurant.id,
+          body:
+            JSON.stringify({
+              restaurantId:
+                restaurant.id,
 
-        restaurantName:
-          restaurant.name,
+              restaurantName:
+                restaurant.name,
 
-        photoIndex,
+              photoIndex,
 
-        sourceUrl,
-      }),
+              sourceUrl,
+            }),
 
-      cache: "no-store",
+          cache:
+            "no-store",
+        }
+      );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data?.error ||
+          `HTTP ${response.status}`
+      );
     }
-  );
 
-  const data =
-    await response.json();
+    if (!data?.publicUrl) {
+      throw new Error(
+        "publicUrl missing"
+      );
+    }
 
-  if (!response.ok) {
+    return data.publicUrl;
+  } catch (error) {
     throw new Error(
-      data?.error ||
-        `Could not cache photo for ${restaurant.name}.`
+      `STEP 3 — photo cache failed for ${restaurant.name}: ${
+        error instanceof Error
+          ? error.message
+          : String(error)
+      }`
     );
   }
-
-  if (!data?.publicUrl) {
-    throw new Error(
-      `Cached photo URL missing for ${restaurant.name}.`
-    );
-  }
-
-  return data.publicUrl;
 }
 
 async function buildSlide(
-  restaurantId,
+  restaurant,
   photoUrl
 ) {
-  const response = await fetch(
-    `${SITE_URL}/api/cache-restaurant-slide`,
-    {
-      method: "POST",
+  try {
+    const response =
+      await fetch(
+        `${SITE_URL}/api/cache-restaurant-slide`,
+        {
+          method: "POST",
 
-      headers: {
-        "Content-Type":
-          "application/json",
-      },
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
 
-      body: JSON.stringify({
-        restaurantId,
-        photoUrl,
-      }),
+          body:
+            JSON.stringify({
+              restaurantId:
+                restaurant.id,
 
-      cache: "no-store",
+              photoUrl,
+            }),
+
+          cache:
+            "no-store",
+        }
+      );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data?.error ||
+          `HTTP ${response.status}`
+      );
     }
-  );
 
-  const data =
-    await response.json();
+    if (!data?.publicUrl) {
+      throw new Error(
+        "slide publicUrl missing"
+      );
+    }
 
-  if (!response.ok) {
+    return data.publicUrl;
+  } catch (error) {
     throw new Error(
-      data?.error ||
-        `Could not build slide for ${restaurantId}.`
+      `STEP 4 — slide generation failed for ${restaurant.name}: ${
+        error instanceof Error
+          ? error.message
+          : String(error)
+      }`
     );
   }
-
-  if (!data?.publicUrl) {
-    throw new Error(
-      `Slide URL missing for ${restaurantId}.`
-    );
-  }
-
-  return data.publicUrl;
 }
 
 function buildCaption(
@@ -302,20 +319,21 @@ function buildCaption(
     "",
   ];
 
-  restaurants.forEach(
-    (restaurant) => {
-      parts.push(
-        restaurant.name
-      );
+  for (
+    const restaurant of
+    restaurants
+  ) {
+    parts.push(
+      restaurant.name
+    );
 
-      parts.push(
-        restaurant.why_we_like_it ||
-          ""
-      );
+    parts.push(
+      restaurant.why_we_like_it ||
+        ""
+    );
 
-      parts.push("");
-    }
-  );
+    parts.push("");
+  }
 
   parts.push(
     config.outro
@@ -335,116 +353,111 @@ async function createQueueItem({
   restaurants,
   slideUrls,
 }) {
-  const caption =
-    buildCaption(
-      config,
-      restaurants
-    );
+  try {
+    const caption =
+      buildCaption(
+        config,
+        restaurants
+      );
 
-  const payload = {
-    title:
-      config.title,
+    const response =
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/content_queue`,
+        {
+          method: "POST",
 
-    content_type:
-      "carousel",
+          headers:
+            supabaseHeaders({
+              Prefer:
+                "return=representation",
+            }),
 
-    topic:
-      config.topic,
+          body:
+            JSON.stringify({
+              title:
+                config.title,
 
-    caption,
+              content_type:
+                "carousel",
 
-    slide_text:
-      restaurants.map(
-        (
-          restaurant,
-          index
-        ) => ({
-          slide:
-            index + 1,
+              topic:
+                config.topic,
 
-          restaurant:
-            restaurant.name,
-        })
-      ),
+              caption,
 
-    media_urls:
-      slideUrls,
+              slide_text:
+                restaurants.map(
+                  (
+                    restaurant,
+                    index
+                  ) => ({
+                    slide:
+                      index + 1,
 
-    source_restaurant_ids:
-      restaurants.map(
-        (restaurant) =>
-          restaurant.id
-      ),
+                    restaurant:
+                      restaurant.name,
+                  })
+                ),
 
-    salve_featured:
-      restaurants.some(
-        (restaurant) =>
-          restaurant.id ===
-          "R001"
-      ),
+              media_urls:
+                slideUrls,
 
-    status:
-      "ready_for_review",
+              source_restaurant_ids:
+                restaurants.map(
+                  (
+                    restaurant
+                  ) =>
+                    restaurant.id
+                ),
 
-    generation_notes:
-      "Generated automatically by the generic Feed Me Budapest content generator.",
-  };
+              salve_featured:
+                restaurants.some(
+                  (
+                    restaurant
+                  ) =>
+                    restaurant.id ===
+                    "R001"
+                ),
 
-  const response = await fetch(
-    `${SUPABASE_URL}/rest/v1/content_queue`,
-    {
-      method: "POST",
+              status:
+                "ready_for_review",
 
-      headers:
-        supabaseHeaders({
-          Prefer:
-            "return=representation",
-        }),
+              generation_notes:
+                "Generated automatically by Feed Me Budapest content generator.",
+            }),
 
-      body:
-        JSON.stringify(
-          payload
-        ),
+          cache:
+            "no-store",
+        }
+      );
 
-      cache: "no-store",
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data?.message ||
+          data?.error ||
+          `HTTP ${response.status}`
+      );
     }
-  );
 
-  const data =
-    await response.json();
-
-  if (!response.ok) {
+    return data?.[0] || null;
+  } catch (error) {
     throw new Error(
-      data?.message ||
-        data?.error ||
-        "Could not create Pending content."
+      `STEP 5 — Pending creation failed: ${
+        error instanceof Error
+          ? error.message
+          : String(error)
+      }`
     );
   }
-
-  return data?.[0] || null;
 }
 
 export async function POST(
   request
 ) {
   try {
-    if (
-      !SUPABASE_URL ||
-      !SUPABASE_SECRET_KEY
-    ) {
-      return Response.json(
-        {
-          ok: false,
-
-          error:
-            "Supabase configuration missing.",
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
     const body =
       await request.json();
 
@@ -456,12 +469,13 @@ export async function POST(
       "coffee";
 
     if (
-      !isAuthorized(adminKey)
+      !isAuthorized(
+        adminKey
+      )
     ) {
       return Response.json(
         {
           ok: false,
-
           error:
             "Incorrect admin password.",
         },
@@ -471,37 +485,28 @@ export async function POST(
       );
     }
 
+    if (
+      !SUPABASE_URL ||
+      !SUPABASE_SECRET_KEY
+    ) {
+      throw new Error(
+        "Supabase environment variables missing."
+      );
+    }
+
     const config =
       TOPICS[topic];
 
     if (!config) {
-      return Response.json(
-        {
-          ok: false,
-
-          error:
-            `Unsupported topic: ${topic}`,
-        },
-        {
-          status: 400,
-        }
+      throw new Error(
+        `Unsupported topic: ${topic}`
       );
     }
-
-    /*
-      STEP 1
-      Load restaurants
-    */
 
     const restaurants =
       await loadRestaurants(
         config.restaurantIds
       );
-
-    /*
-      STEP 2
-      Build each restaurant slide
-    */
 
     const slideUrls = [];
 
@@ -517,7 +522,7 @@ export async function POST(
           restaurant
         );
 
-      const cachedPhotoUrl =
+      const photoUrl =
         await cachePhoto(
           restaurant,
           sourceUrl,
@@ -526,19 +531,14 @@ export async function POST(
 
       const slideUrl =
         await buildSlide(
-          restaurant.id,
-          cachedPhotoUrl
+          restaurant,
+          photoUrl
         );
 
       slideUrls.push(
         slideUrl
       );
     }
-
-    /*
-      STEP 3
-      Create Pending content
-    */
 
     const queueItem =
       await createQueueItem({
@@ -549,37 +549,14 @@ export async function POST(
 
     return Response.json({
       ok: true,
-
       topic,
-
       title:
         config.title,
-
-      restaurants:
-        restaurants.map(
-          (restaurant) => ({
-            id:
-              restaurant.id,
-
-            name:
-              restaurant.name,
-
-            photoIndex:
-              restaurant.google_photo_index,
-          })
-        ),
-
+      queueItem,
       slides:
         slideUrls,
-
-      queueItem,
     });
   } catch (error) {
-    console.error(
-      "GENERATE CONTENT ERROR:",
-      error
-    );
-
     return Response.json(
       {
         ok: false,
@@ -587,7 +564,7 @@ export async function POST(
         error:
           error instanceof Error
             ? error.message
-            : "Unknown error",
+            : String(error),
       },
       {
         status: 500,
