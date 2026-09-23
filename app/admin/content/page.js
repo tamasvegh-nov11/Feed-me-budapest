@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const VERSION = "FMB-ADMIN-V7";
+const VERSION = "FMB-ADMIN-V8";
 
 const STATUS_LABELS = {
   ready_for_review: "Pending",
@@ -25,8 +25,12 @@ export default function ContentAdminPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
+  const [generating, setGenerating] = useState(false);
+  const [generateTopic, setGenerateTopic] = useState("coffee");
+
   useEffect(() => {
-    const savedKey = sessionStorage.getItem("feedme_admin_key");
+    const savedKey =
+      sessionStorage.getItem("feedme_admin_key");
 
     if (savedKey) {
       setAdminKey(savedKey);
@@ -41,31 +45,46 @@ export default function ContentAdminPage() {
     setMessage("");
 
     try {
-      const response = await fetch("/api/admin/content", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          adminKey: key,
-        }),
-        cache: "no-store",
-      });
+      const response = await fetch(
+        "/api/admin/content",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            adminKey: key,
+          }),
+          cache: "no-store",
+        }
+      );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         setAuthenticated(false);
-        sessionStorage.removeItem("feedme_admin_key");
+
+        sessionStorage.removeItem(
+          "feedme_admin_key"
+        );
 
         if (response.status === 401) {
           throw new Error(
-            `${data.error} Sent ${data.receivedLength ?? "?"} characters, expected ${data.expectedLength ?? "?"}. API: ${data.version ?? "unknown"}`
+            `${data.error} Sent ${
+              data.receivedLength ?? "?"
+            } characters, expected ${
+              data.expectedLength ?? "?"
+            }. API: ${
+              data.version ?? "unknown"
+            }`
           );
         }
 
         throw new Error(
-          data.error || "Could not load content."
+          data.error ||
+            "Could not load content."
         );
       }
 
@@ -78,11 +97,16 @@ export default function ContentAdminPage() {
       );
 
       if (selected) {
-        const updated = (data.items || []).find(
-          (item) => item.id === selected.id
+        const updated = (
+          data.items || []
+        ).find(
+          (item) =>
+            item.id === selected.id
         );
 
-        setSelected(updated || null);
+        setSelected(
+          updated || null
+        );
       }
     } catch (error) {
       setMessage(
@@ -101,7 +125,10 @@ export default function ContentAdminPage() {
   }
 
   function logout() {
-    sessionStorage.removeItem("feedme_admin_key");
+    sessionStorage.removeItem(
+      "feedme_admin_key"
+    );
+
     setAdminKey("");
     setAuthenticated(false);
     setItems([]);
@@ -109,28 +136,37 @@ export default function ContentAdminPage() {
     setMessage("");
   }
 
-  async function changeStatus(id, status) {
+  async function changeStatus(
+    id,
+    status
+  ) {
     setLoading(true);
     setMessage("");
 
     try {
-      const response = await fetch("/api/admin/content", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          adminKey,
-          id,
-          status,
-        }),
-      });
+      const response = await fetch(
+        "/api/admin/content",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            adminKey,
+            id,
+            status,
+          }),
+        }
+      );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.error || "Update failed."
+          data.error ||
+            "Update failed."
         );
       }
 
@@ -141,66 +177,10 @@ export default function ContentAdminPage() {
       );
 
       setSelected(null);
-      await loadContent(adminKey);
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Unknown error"
+
+      await loadContent(
+        adminKey
       );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function preparePhotos(id) {
-    setLoading(true);
-    setMessage("");
-
-    try {
-      const response = await fetch("/api/admin/content", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          adminKey,
-          id,
-          action: "prepare_photos",
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error || "Could not prepare photos."
-        );
-      }
-
-      const preparedCount =
-        Array.isArray(data.prepared)
-          ? data.prepared.length
-          : 0;
-
-      const errorCount =
-        Array.isArray(data.errors)
-          ? data.errors.length
-          : 0;
-
-      setMessage(
-        errorCount > 0
-          ? `Photos prepared: ${preparedCount}. Some images failed: ${errorCount}.`
-          : `✓ ${preparedCount} restaurant photos prepared successfully.`
-      );
-
-      await loadContent(adminKey);
-
-      const refreshedItem = data.item || null;
-
-      if (refreshedItem) {
-        setSelected(refreshedItem);
-      }
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -213,9 +193,10 @@ export default function ContentAdminPage() {
   }
 
   async function cancelSchedule(id) {
-    const confirmed = window.confirm(
-      "Cancel this scheduled Buffer post and move it back to Pending?"
-    );
+    const confirmed =
+      window.confirm(
+        "Cancel this scheduled Buffer post and move it back to Pending?"
+      );
 
     if (!confirmed) return;
 
@@ -223,23 +204,30 @@ export default function ContentAdminPage() {
     setMessage("");
 
     try {
-      const response = await fetch("/api/admin/content", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          adminKey,
-          id,
-          action: "cancel_schedule",
-        }),
-      });
+      const response = await fetch(
+        "/api/admin/content",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            adminKey,
+            id,
+            action:
+              "cancel_schedule",
+          }),
+        }
+      );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.error || "Could not cancel schedule."
+          data.error ||
+            "Could not cancel schedule."
         );
       }
 
@@ -248,9 +236,13 @@ export default function ContentAdminPage() {
       );
 
       setSelected(null);
-      setFilter("ready_for_review");
+      setFilter(
+        "ready_for_review"
+      );
 
-      await loadContent(adminKey);
+      await loadContent(
+        adminKey
+      );
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -262,15 +254,83 @@ export default function ContentAdminPage() {
     }
   }
 
+  async function generateContent() {
+    setGenerating(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(
+        "/api/admin/generate-content",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            adminKey,
+            topic:
+              generateTopic,
+          }),
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            "Could not generate content."
+        );
+      }
+
+      setMessage(
+        `✓ New ${
+          generateTopic === "coffee"
+            ? "coffee"
+            : "pizza"
+        } carousel created and added to Pending.`
+      );
+
+      setFilter(
+        "ready_for_review"
+      );
+
+      setSelected(null);
+
+      await loadContent(
+        adminKey
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not generate content."
+      );
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   if (!authenticated) {
     return (
       <main style={styles.loginPage}>
-        <form onSubmit={login} style={styles.loginBox}>
+        <form
+          onSubmit={login}
+          style={styles.loginBox}
+        >
           <div style={styles.eyebrow}>
             FEED ME BUDAPEST
           </div>
 
-          <h1 style={styles.loginTitle}>
+          <h1
+            style={
+              styles.loginTitle
+            }
+          >
             Content Dashboard
           </h1>
 
@@ -282,7 +342,9 @@ export default function ContentAdminPage() {
             type="password"
             value={adminKey}
             onChange={(e) =>
-              setAdminKey(e.target.value)
+              setAdminKey(
+                e.target.value
+              )
             }
             placeholder="Admin password"
             autoComplete="off"
@@ -292,18 +354,30 @@ export default function ContentAdminPage() {
           <button
             type="submit"
             disabled={loading}
-            style={styles.loginButton}
+            style={
+              styles.loginButton
+            }
           >
-            {loading ? "Signing in…" : "Sign in"}
+            {loading
+              ? "Signing in…"
+              : "Sign in"}
           </button>
 
           {message && (
-            <div style={styles.error}>
+            <div
+              style={
+                styles.error
+              }
+            >
               {message}
             </div>
           )}
 
-          <div style={styles.version}>
+          <div
+            style={
+              styles.version
+            }
+          >
             {VERSION}
           </div>
         </form>
@@ -311,9 +385,11 @@ export default function ContentAdminPage() {
     );
   }
 
-  const filtered = items.filter(
-    (item) => item.status === filter
-  );
+  const filtered =
+    items.filter(
+      (item) =>
+        item.status === filter
+    );
 
   const tabs = [
     "ready_for_review",
@@ -327,66 +403,207 @@ export default function ContentAdminPage() {
     <main style={styles.page}>
       <div style={styles.header}>
         <div>
-          <div style={styles.eyebrow}>
+          <div
+            style={styles.eyebrow}
+          >
             FEED ME BUDAPEST
           </div>
 
-          <h1 style={styles.title}>
+          <h1
+            style={styles.title}
+          >
             Content Dashboard
           </h1>
 
-          <p style={styles.subtitle}>
-            Review and approve Instagram content.
+          <p
+            style={
+              styles.subtitle
+            }
+          >
+            Generate, review and approve Instagram content.
           </p>
         </div>
 
-        <div style={styles.headerButtons}>
+        <div
+          style={
+            styles.headerButtons
+          }
+        >
           <button
-            onClick={() => loadContent(adminKey)}
-            style={styles.secondaryButton}
+            onClick={() =>
+              loadContent(
+                adminKey
+              )
+            }
+            style={
+              styles.secondaryButton
+            }
           >
             Refresh
           </button>
 
           <button
             onClick={logout}
-            style={styles.primaryButton}
+            style={
+              styles.primaryButton
+            }
           >
             Log out
           </button>
         </div>
       </div>
 
-      <div style={styles.tabs}>
-        {tabs.map((status) => (
+      {/* GENERATOR */}
+
+      <section
+        style={
+          styles.generator
+        }
+      >
+        <div>
+          <div
+            style={
+              styles.generatorEyebrow
+            }
+          >
+            CONTENT GENERATOR
+          </div>
+
+          <h2
+            style={
+              styles.generatorTitle
+            }
+          >
+            Create a new post
+          </h2>
+
+          <p
+            style={
+              styles.generatorText
+            }
+          >
+            The system selects the saved restaurant photos,
+            builds the branded slides and adds the finished
+            carousel to Pending for review.
+          </p>
+        </div>
+
+        <div
+          style={
+            styles.generatorControls
+          }
+        >
           <button
-            key={status}
-            onClick={() => {
-              setFilter(status);
-              setSelected(null);
-            }}
+            onClick={() =>
+              setGenerateTopic(
+                "coffee"
+              )
+            }
             style={{
-              ...styles.tab,
-              ...(filter === status
-                ? styles.activeTab
+              ...styles.topicButton,
+
+              ...(generateTopic ===
+              "coffee"
+                ? styles.activeTopic
                 : {}),
             }}
           >
-            {STATUS_LABELS[status]}
-
-            <span style={styles.count}>
-              {
-                items.filter(
-                  (item) => item.status === status
-                ).length
-              }
-            </span>
+            ☕ Coffee
           </button>
-        ))}
+
+          <button
+            onClick={() =>
+              setGenerateTopic(
+                "pizza"
+              )
+            }
+            style={{
+              ...styles.topicButton,
+
+              ...(generateTopic ===
+              "pizza"
+                ? styles.activeTopic
+                : {}),
+            }}
+          >
+            🍕 Pizza
+          </button>
+
+          <button
+            onClick={
+              generateContent
+            }
+            disabled={
+              generating
+            }
+            style={{
+              ...styles.generateButton,
+
+              opacity:
+                generating
+                  ? 0.6
+                  : 1,
+            }}
+          >
+            {generating
+              ? "Generating…"
+              : "Generate content"}
+          </button>
+        </div>
+      </section>
+
+      <div style={styles.tabs}>
+        {tabs.map(
+          (status) => (
+            <button
+              key={status}
+              onClick={() => {
+                setFilter(
+                  status
+                );
+                setSelected(
+                  null
+                );
+              }}
+              style={{
+                ...styles.tab,
+
+                ...(filter ===
+                status
+                  ? styles.activeTab
+                  : {}),
+              }}
+            >
+              {
+                STATUS_LABELS[
+                  status
+                ]
+              }
+
+              <span
+                style={
+                  styles.count
+                }
+              >
+                {
+                  items.filter(
+                    (item) =>
+                      item.status ===
+                      status
+                  ).length
+                }
+              </span>
+            </button>
+          )
+        )}
       </div>
 
       {message && (
-        <div style={styles.message}>
+        <div
+          style={
+            styles.message
+          }
+        >
           {message}
         </div>
       )}
@@ -395,90 +612,178 @@ export default function ContentAdminPage() {
         <div style={styles.empty}>
           Loading…
         </div>
-      ) : filtered.length === 0 ? (
+      ) : filtered.length ===
+        0 ? (
         <div style={styles.empty}>
-          No {STATUS_LABELS[filter].toLowerCase()} content yet.
+          No{" "}
+          {STATUS_LABELS[
+            filter
+          ].toLowerCase()}{" "}
+          content yet.
         </div>
       ) : (
         <div style={styles.grid}>
           <div style={styles.list}>
-            {filtered.map((item) => (
-              <button
-                key={item.id}
-                onClick={() =>
-                  setSelected(item)
-                }
-                style={{
-                  ...styles.card,
-                  ...(selected?.id === item.id
-                    ? styles.selectedCard
-                    : {}),
-                }}
-              >
-                <div style={styles.cardTop}>
-                  <span style={styles.type}>
-                    {item.content_type?.toUpperCase()}
-                  </span>
+            {filtered.map(
+              (item) => (
+                <button
+                  key={item.id}
+                  onClick={() =>
+                    setSelected(
+                      item
+                    )
+                  }
+                  style={{
+                    ...styles.card,
 
-                  {item.salve_featured && (
-                    <span style={styles.salve}>
-                      SALVE
+                    ...(selected?.id ===
+                    item.id
+                      ? styles.selectedCard
+                      : {}),
+                  }}
+                >
+                  <div
+                    style={
+                      styles.cardTop
+                    }
+                  >
+                    <span
+                      style={
+                        styles.type
+                      }
+                    >
+                      {item.content_type?.toUpperCase()}
                     </span>
+
+                    {item.salve_featured && (
+                      <span
+                        style={
+                          styles.salve
+                        }
+                      >
+                        SALVE
+                      </span>
+                    )}
+                  </div>
+
+                  <h2
+                    style={
+                      styles.cardTitle
+                    }
+                  >
+                    {item.title}
+                  </h2>
+
+                  {item.topic && (
+                    <div
+                      style={
+                        styles.topic
+                      }
+                    >
+                      {
+                        item.topic
+                      }
+                    </div>
                   )}
-                </div>
 
-                <h2 style={styles.cardTitle}>
-                  {item.title}
-                </h2>
-
-                {item.topic && (
-                  <div style={styles.topic}>
-                    {item.topic}
-                  </div>
-                )}
-
-                {item.publish_at && (
-                  <div style={styles.date}>
-                    {new Date(
-                      item.publish_at
-                    ).toLocaleString()}
-                  </div>
-                )}
-              </button>
-            ))}
+                  {item.publish_at && (
+                    <div
+                      style={
+                        styles.date
+                      }
+                    >
+                      {new Date(
+                        item.publish_at
+                      ).toLocaleString()}
+                    </div>
+                  )}
+                </button>
+              )
+            )}
           </div>
 
-          <div style={styles.preview}>
+          <div
+            style={
+              styles.preview
+            }
+          >
             {!selected ? (
-              <div style={styles.previewEmpty}>
+              <div
+                style={
+                  styles.previewEmpty
+                }
+              >
                 Select a content item to preview it.
               </div>
             ) : (
               <>
-                <div style={styles.previewHeader}>
-                  <span style={styles.type}>
+                <div
+                  style={
+                    styles.previewHeader
+                  }
+                >
+                  <span
+                    style={
+                      styles.type
+                    }
+                  >
                     {selected.content_type?.toUpperCase()}
                   </span>
 
-                  <span style={styles.status}>
-                    {STATUS_LABELS[selected.status] || selected.status}
+                  <span
+                    style={
+                      styles.status
+                    }
+                  >
+                    {STATUS_LABELS[
+                      selected
+                        .status
+                    ] ||
+                      selected.status}
                   </span>
                 </div>
 
-                <h2 style={styles.previewTitle}>
-                  {selected.title}
+                <h2
+                  style={
+                    styles.previewTitle
+                  }
+                >
+                  {
+                    selected.title
+                  }
                 </h2>
 
-                {Array.isArray(selected.media_urls) &&
-                  selected.media_urls.length > 0 && (
-                    <div style={styles.images}>
+                {Array.isArray(
+                  selected.media_urls
+                ) &&
+                  selected
+                    .media_urls
+                    .length >
+                    0 && (
+                    <div
+                      style={
+                        styles.images
+                      }
+                    >
                       {selected.media_urls.map(
-                        (url, index) => (
+                        (
+                          url,
+                          index
+                        ) => (
                           <img
-                            key={index}
-                            src={url}
-                            alt={`Slide ${index + 1}`}
-                            style={styles.image}
+                            key={
+                              index
+                            }
+                            src={
+                              url
+                            }
+                            alt={`Slide ${
+                              index +
+                              1
+                            }`}
+                            style={
+                              styles.image
+                            }
                           />
                         )
                       )}
@@ -486,48 +791,42 @@ export default function ContentAdminPage() {
                   )}
 
                 {selected.caption && (
-                  <section style={styles.section}>
-                    <h3 style={styles.sectionTitle}>
+                  <section
+                    style={
+                      styles.section
+                    }
+                  >
+                    <h3
+                      style={
+                        styles.sectionTitle
+                      }
+                    >
                       Caption
                     </h3>
 
-                    <p style={styles.caption}>
-                      {selected.caption}
+                    <p
+                      style={
+                        styles.caption
+                      }
+                    >
+                      {
+                        selected.caption
+                      }
                     </p>
                   </section>
                 )}
 
-                {Array.isArray(selected.slide_text) &&
-                  selected.slide_text.length > 0 && (
-                    <section style={styles.section}>
-                      <h3 style={styles.sectionTitle}>
-                        Slides
-                      </h3>
-
-                      {selected.slide_text.map(
-                        (slide, index) => (
-                          <div
-                            key={index}
-                            style={styles.slideText}
-                          >
-                            <strong>
-                              Slide {index + 1}
-                            </strong>
-
-                            <div>
-                              {typeof slide === "string"
-                                ? slide
-                                : JSON.stringify(slide)}
-                            </div>
-                          </div>
-                        )
-                      )}
-                    </section>
-                  )}
-
                 {selected.publish_at && (
-                  <section style={styles.section}>
-                    <h3 style={styles.sectionTitle}>
+                  <section
+                    style={
+                      styles.section
+                    }
+                  >
+                    <h3
+                      style={
+                        styles.sectionTitle
+                      }
+                    >
                       Scheduled for
                     </h3>
 
@@ -539,54 +838,59 @@ export default function ContentAdminPage() {
                   </section>
                 )}
 
-                {selected.status === "ready_for_review" && (
-                  <>
-                    <div style={styles.actions}>
-                      <button
-                        onClick={() =>
-                          preparePhotos(selected.id)
-                        }
-                        style={styles.prepare}
-                      >
-                        Prepare photos
-                      </button>
-                    </div>
-
-                    <div style={styles.actions}>
-                      <button
-                        onClick={() =>
-                          changeStatus(
-                            selected.id,
-                            "approved"
-                          )
-                        }
-                        style={styles.approve}
-                      >
-                        ✓ Approve
-                      </button>
-
-                      <button
-                        onClick={() =>
-                          changeStatus(
-                            selected.id,
-                            "rejected"
-                          )
-                        }
-                        style={styles.reject}
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {selected.status === "scheduled" && (
-                  <div style={styles.actions}>
+                {selected.status ===
+                  "ready_for_review" && (
+                  <div
+                    style={
+                      styles.actions
+                    }
+                  >
                     <button
                       onClick={() =>
-                        cancelSchedule(selected.id)
+                        changeStatus(
+                          selected.id,
+                          "approved"
+                        )
                       }
-                      style={styles.cancel}
+                      style={
+                        styles.approve
+                      }
+                    >
+                      ✓ Approve
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        changeStatus(
+                          selected.id,
+                          "rejected"
+                        )
+                      }
+                      style={
+                        styles.reject
+                      }
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+
+                {selected.status ===
+                  "scheduled" && (
+                  <div
+                    style={
+                      styles.actions
+                    }
+                  >
+                    <button
+                      onClick={() =>
+                        cancelSchedule(
+                          selected.id
+                        )
+                      }
+                      style={
+                        styles.cancel
+                      }
                     >
                       Cancel schedule
                     </button>
@@ -594,8 +898,14 @@ export default function ContentAdminPage() {
                 )}
 
                 {selected.error_message && (
-                  <div style={styles.error}>
-                    {selected.error_message}
+                  <div
+                    style={
+                      styles.error
+                    }
+                  >
+                    {
+                      selected.error_message
+                    }
                   </div>
                 )}
               </>
@@ -604,7 +914,11 @@ export default function ContentAdminPage() {
         </div>
       )}
 
-      <div style={styles.footerVersion}>
+      <div
+        style={
+          styles.footerVersion
+        }
+      >
         {VERSION}
       </div>
     </main>
@@ -623,20 +937,23 @@ const styles = {
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
-    fontFamily: "Arial, sans-serif",
+    fontFamily:
+      "Arial, sans-serif",
   },
 
   loginBox: {
     width: "100%",
     maxWidth: 420,
     background: "#fffdf7",
-    border: "1px solid #ddd7ca",
+    border:
+      "1px solid #ddd7ca",
     borderRadius: 22,
     padding: 32,
   },
 
   loginTitle: {
-    fontFamily: "Georgia, serif",
+    fontFamily:
+      "Georgia, serif",
     fontSize: 42,
     margin: "10px 0",
   },
@@ -658,7 +975,8 @@ const styles = {
     padding: 15,
     marginTop: 24,
     borderRadius: 12,
-    border: "1px solid #ccc5b8",
+    border:
+      "1px solid #ccc5b8",
     fontSize: 16,
   },
 
@@ -692,24 +1010,30 @@ const styles = {
     minHeight: "100vh",
     background: cream,
     color: green,
-    padding: "28px 16px 80px",
-    fontFamily: "Arial, sans-serif",
+    padding:
+      "28px 16px 80px",
+    fontFamily:
+      "Arial, sans-serif",
     boxSizing: "border-box",
   },
 
   header: {
     maxWidth: 1200,
-    margin: "0 auto 24px",
+    margin:
+      "0 auto 24px",
     display: "flex",
     flexWrap: "wrap",
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     gap: 16,
     alignItems: "center",
   },
 
   title: {
-    fontFamily: "Georgia, serif",
-    fontSize: "clamp(34px,6vw,64px)",
+    fontFamily:
+      "Georgia, serif",
+    fontSize:
+      "clamp(34px,6vw,64px)",
     margin: "8px 0",
     lineHeight: 0.95,
   },
@@ -729,16 +1053,92 @@ const styles = {
   },
 
   secondaryButton: {
-    border: `1px solid ${green}`,
-    background: "transparent",
+    border:
+      `1px solid ${green}`,
+    background:
+      "transparent",
     color: green,
     borderRadius: 12,
     padding: "11px 16px",
   },
 
+  generator: {
+    maxWidth: 1200,
+    margin:
+      "0 auto 24px",
+    background: "#fffdf7",
+    border:
+      "1px solid #ddd7ca",
+    borderRadius: 20,
+    padding: 22,
+    display: "flex",
+    justifyContent:
+      "space-between",
+    alignItems: "center",
+    gap: 24,
+    flexWrap: "wrap",
+  },
+
+  generatorEyebrow: {
+    fontSize: 11,
+    letterSpacing: 3,
+    fontWeight: 700,
+    opacity: 0.7,
+  },
+
+  generatorTitle: {
+    fontFamily:
+      "Georgia, serif",
+    fontSize: 30,
+    margin: "6px 0",
+  },
+
+  generatorText: {
+    margin: 0,
+    lineHeight: 1.5,
+    opacity: 0.7,
+    maxWidth: 600,
+  },
+
+  generatorControls: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+
+  topicButton: {
+    border:
+      `1px solid ${green}`,
+    background:
+      "transparent",
+    color: green,
+    borderRadius: 30,
+    padding:
+      "11px 16px",
+    fontWeight: 700,
+  },
+
+  activeTopic: {
+    background: green,
+    color: cream,
+  },
+
+  generateButton: {
+    border: "none",
+    background: green,
+    color: cream,
+    borderRadius: 12,
+    padding:
+      "13px 20px",
+    fontWeight: 700,
+    fontSize: 15,
+  },
+
   tabs: {
     maxWidth: 1200,
-    margin: "0 auto 25px",
+    margin:
+      "0 auto 25px",
     display: "flex",
     gap: 8,
     overflowX: "auto",
@@ -767,7 +1167,8 @@ const styles = {
 
   message: {
     maxWidth: 1200,
-    margin: "0 auto 20px",
+    margin:
+      "0 auto 20px",
     padding: 14,
     background: "#e2ebdf",
     borderRadius: 10,
@@ -785,7 +1186,8 @@ const styles = {
 
   list: {
     display: "flex",
-    flexDirection: "column",
+    flexDirection:
+      "column",
     gap: 12,
     minWidth: 0,
   },
@@ -795,14 +1197,16 @@ const styles = {
     textAlign: "left",
     background: "#fffdf7",
     color: green,
-    border: "1px solid #ddd7ca",
+    border:
+      "1px solid #ddd7ca",
     borderRadius: 16,
     padding: 18,
     boxSizing: "border-box",
   },
 
   selectedCard: {
-    border: `2px solid ${green}`,
+    border:
+      `2px solid ${green}`,
   },
 
   cardTop: {
@@ -826,8 +1230,10 @@ const styles = {
   },
 
   cardTitle: {
-    fontFamily: "Georgia, serif",
-    margin: "0 0 8px",
+    fontFamily:
+      "Georgia, serif",
+    margin:
+      "0 0 8px",
     fontSize: 22,
     lineHeight: 1.1,
   },
@@ -846,8 +1252,10 @@ const styles = {
   preview: {
     background: "#fffdf7",
     borderRadius: 20,
-    padding: "clamp(20px,4vw,35px)",
-    border: "1px solid #ddd7ca",
+    padding:
+      "clamp(20px,4vw,35px)",
+    border:
+      "1px solid #ddd7ca",
     minHeight: 320,
     minWidth: 0,
     overflow: "hidden",
@@ -857,12 +1265,14 @@ const styles = {
   previewEmpty: {
     opacity: 0.5,
     textAlign: "center",
-    padding: "70px 20px",
+    padding:
+      "70px 20px",
   },
 
   previewHeader: {
     display: "flex",
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     gap: 12,
     flexWrap: "wrap",
   },
@@ -875,11 +1285,15 @@ const styles = {
   },
 
   previewTitle: {
-    fontFamily: "Georgia, serif",
-    fontSize: "clamp(28px,5vw,46px)",
-    margin: "18px 0 25px",
+    fontFamily:
+      "Georgia, serif",
+    fontSize:
+      "clamp(28px,5vw,46px)",
+    margin:
+      "18px 0 25px",
     lineHeight: 1.05,
-    overflowWrap: "anywhere",
+    overflowWrap:
+      "anywhere",
   },
 
   images: {
@@ -891,58 +1305,47 @@ const styles = {
   },
 
   image: {
-    width: "min(180px, 70vw)",
-    aspectRatio: "4 / 5",
+    width:
+      "min(180px, 70vw)",
+    aspectRatio:
+      "4 / 5",
     objectFit: "cover",
     borderRadius: 12,
     flexShrink: 0,
   },
 
   section: {
-    borderTop: "1px solid #ddd7ca",
+    borderTop:
+      "1px solid #ddd7ca",
     paddingTop: 20,
     marginTop: 20,
-    minWidth: 0,
   },
 
   sectionTitle: {
     fontSize: 12,
-    textTransform: "uppercase",
+    textTransform:
+      "uppercase",
     letterSpacing: 2,
   },
 
   caption: {
-    whiteSpace: "pre-wrap",
+    whiteSpace:
+      "pre-wrap",
     lineHeight: 1.6,
-    overflowWrap: "anywhere",
-    wordBreak: "break-word",
-  },
-
-  slideText: {
-    padding: "10px 0",
-    lineHeight: 1.5,
-    overflowWrap: "anywhere",
+    overflowWrap:
+      "anywhere",
   },
 
   actions: {
     display: "flex",
     gap: 12,
-    marginTop: 20,
+    marginTop: 30,
     flexWrap: "wrap",
   },
 
-  prepare: {
-    width: "100%",
-    border: `1px solid ${green}`,
-    background: "#eef3ef",
-    color: green,
-    padding: 15,
-    borderRadius: 12,
-    fontWeight: 700,
-  },
-
   approve: {
-    flex: "1 1 180px",
+    flex:
+      "1 1 180px",
     border: "none",
     background: green,
     color: cream,
@@ -952,9 +1355,12 @@ const styles = {
   },
 
   reject: {
-    flex: "1 1 120px",
-    border: `1px solid ${green}`,
-    background: "transparent",
+    flex:
+      "1 1 120px",
+    border:
+      `1px solid ${green}`,
+    background:
+      "transparent",
     color: green,
     padding: 15,
     borderRadius: 12,
@@ -962,7 +1368,8 @@ const styles = {
 
   cancel: {
     width: "100%",
-    border: "1px solid #9b2c2c",
+    border:
+      "1px solid #9b2c2c",
     background: "#fff7f7",
     color: "#9b2c2c",
     padding: 15,
@@ -972,14 +1379,16 @@ const styles = {
 
   empty: {
     maxWidth: 1200,
-    margin: "50px auto",
+    margin:
+      "50px auto",
     textAlign: "center",
     opacity: 0.55,
   },
 
   footerVersion: {
     maxWidth: 1200,
-    margin: "60px auto 0",
+    margin:
+      "60px auto 0",
     opacity: 0.25,
     fontSize: 11,
   },
