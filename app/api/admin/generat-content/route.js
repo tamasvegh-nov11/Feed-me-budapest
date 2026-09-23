@@ -77,19 +77,31 @@ function isAuthorized(adminKey) {
 function supabaseHeaders(extra = {}) {
   return {
     apikey: SUPABASE_SECRET_KEY,
-    "Content-Type":
-      "application/json",
+    "Content-Type": "application/json",
     ...extra,
   };
 }
 
 async function loadRestaurants(ids) {
-  const queryIds = ids
-    .map((id) => `"${id}"`)
-    .join(",");
+  /*
+    IMPORTANT FIX:
+    PostgREST in.(...) should use:
+    in.(R079,R008,R062)
+
+    Not:
+    in.("R079","R008","R062")
+  */
+
+  const queryIds =
+    ids.join(",");
+
+  const url =
+    `${SUPABASE_URL}/rest/v1/feed_restaurants` +
+    `?id=in.(${queryIds})` +
+    `&select=id,name,why_we_like_it,good_to_know,primary_area,google_place_id,google_photo_index`;
 
   const response = await fetch(
-    `${SUPABASE_URL}/rest/v1/feed_restaurants?id=in.(${queryIds})&select=id,name,why_we_like_it,good_to_know,primary_area,google_place_id,google_photo_index`,
+    url,
     {
       headers:
         supabaseHeaders(),
@@ -107,6 +119,11 @@ async function loadRestaurants(ids) {
         "Could not load restaurants."
     );
   }
+
+  /*
+    Keep exactly the same order
+    as configured in TOPICS.
+  */
 
   return ids.map((id) => {
     const restaurant =
@@ -136,21 +153,25 @@ async function getPlacePhoto(
     );
   }
 
+  const rawIndex =
+    Number(
+      restaurant.google_photo_index
+    );
+
   const index =
-    Number.isInteger(
-      Number(
-        restaurant.google_photo_index
-      )
-    )
-      ? Number(
-          restaurant.google_photo_index
-        )
+    Number.isInteger(rawIndex)
+      ? rawIndex
       : 0;
 
-  const response = await fetch(
-    `${SITE_URL}/api/place-photo?placeId=${encodeURIComponent(
+  const url =
+    `${SITE_URL}/api/place-photo` +
+    `?placeId=${encodeURIComponent(
       restaurant.google_place_id
-    )}&index=${index}`,
+    )}` +
+    `&index=${index}`;
+
+  const response = await fetch(
+    url,
     {
       cache: "no-store",
     }
@@ -172,6 +193,7 @@ async function getPlacePhoto(
   return {
     sourceUrl:
       data.url,
+
     photoIndex:
       index,
   };
@@ -186,10 +208,12 @@ async function cachePhoto(
     `${SITE_URL}/api/cache-place-photo`,
     {
       method: "POST",
+
       headers: {
         "Content-Type":
           "application/json",
       },
+
       body: JSON.stringify({
         restaurantId:
           restaurant.id,
@@ -233,10 +257,12 @@ async function buildSlide(
     `${SITE_URL}/api/cache-restaurant-slide`,
     {
       method: "POST",
+
       headers: {
         "Content-Type":
           "application/json",
       },
+
       body: JSON.stringify({
         restaurantId,
         photoUrl,
@@ -291,8 +317,12 @@ function buildCaption(
     }
   );
 
-  parts.push(config.outro);
+  parts.push(
+    config.outro
+  );
+
   parts.push("");
+
   parts.push(
     config.hashtags
   );
@@ -311,6 +341,55 @@ async function createQueueItem({
       restaurants
     );
 
+  const payload = {
+    title:
+      config.title,
+
+    content_type:
+      "carousel",
+
+    topic:
+      config.topic,
+
+    caption,
+
+    slide_text:
+      restaurants.map(
+        (
+          restaurant,
+          index
+        ) => ({
+          slide:
+            index + 1,
+
+          restaurant:
+            restaurant.name,
+        })
+      ),
+
+    media_urls:
+      slideUrls,
+
+    source_restaurant_ids:
+      restaurants.map(
+        (restaurant) =>
+          restaurant.id
+      ),
+
+    salve_featured:
+      restaurants.some(
+        (restaurant) =>
+          restaurant.id ===
+          "R001"
+      ),
+
+    status:
+      "ready_for_review",
+
+    generation_notes:
+      "Generated automatically by the generic Feed Me Budapest content generator.",
+  };
+
   const response = await fetch(
     `${SUPABASE_URL}/rest/v1/content_queue`,
     {
@@ -322,54 +401,12 @@ async function createQueueItem({
             "return=representation",
         }),
 
-      body: JSON.stringify({
-        title:
-          config.title,
+      body:
+        JSON.stringify(
+          payload
+        ),
 
-        content_type:
-          "carousel",
-
-        topic:
-          config.topic,
-
-        caption,
-
-        slide_text:
-          restaurants.map(
-            (
-              restaurant,
-              index
-            ) => ({
-              slide:
-                index + 1,
-
-              restaurant:
-                restaurant.name,
-            })
-          ),
-
-        media_urls:
-          slideUrls,
-
-        source_restaurant_ids:
-          restaurants.map(
-            (restaurant) =>
-              restaurant.id
-          ),
-
-        salve_featured:
-          restaurants.some(
-            (restaurant) =>
-              restaurant.id ===
-              "R001"
-          ),
-
-        status:
-          "ready_for_review",
-
-        generation_notes:
-          "Generated automatically by the generic Feed Me Budapest content generator.",
-      }),
+      cache: "no-store",
     }
   );
 
@@ -398,6 +435,7 @@ export async function POST(
       return Response.json(
         {
           ok: false,
+
           error:
             "Supabase configuration missing.",
         },
@@ -423,6 +461,7 @@ export async function POST(
       return Response.json(
         {
           ok: false,
+
           error:
             "Incorrect admin password.",
         },
@@ -439,8 +478,9 @@ export async function POST(
       return Response.json(
         {
           ok: false,
+
           error:
-            "Unsupported topic.",
+            `Unsupported topic: ${topic}`,
         },
         {
           status: 400,
@@ -448,10 +488,20 @@ export async function POST(
       );
     }
 
+    /*
+      STEP 1
+      Load restaurants
+    */
+
     const restaurants =
       await loadRestaurants(
         config.restaurantIds
       );
+
+    /*
+      STEP 2
+      Build each restaurant slide
+    */
 
     const slideUrls = [];
 
@@ -485,6 +535,11 @@ export async function POST(
       );
     }
 
+    /*
+      STEP 3
+      Create Pending content
+    */
+
     const queueItem =
       await createQueueItem({
         config,
@@ -500,12 +555,31 @@ export async function POST(
       title:
         config.title,
 
+      restaurants:
+        restaurants.map(
+          (restaurant) => ({
+            id:
+              restaurant.id,
+
+            name:
+              restaurant.name,
+
+            photoIndex:
+              restaurant.google_photo_index,
+          })
+        ),
+
       slides:
         slideUrls,
 
       queueItem,
     });
   } catch (error) {
+    console.error(
+      "GENERATE CONTENT ERROR:",
+      error
+    );
+
     return Response.json(
       {
         ok: false,
